@@ -23,4 +23,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Adapt IQ"
-include(":app")
+include(":app", ":admin")

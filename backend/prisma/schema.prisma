@@ -1,0 +1,106 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model AdminUser {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         String   @default("RESEARCHER") // RESEARCHER, SUPER_ADMIN
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("admin_users")
+}
+
+model Participant {
+  id          String    @id @default(uuid())
+  pseudonymId String    @unique @map("pseudonym_id") // e.g. TEST_001
+  createdAt   DateTime  @default(now()) @map("created_at")
+  sessions    Session[]
+
+  @@map("participants")
+}
+
+model Session {
+  id               String         @id @default(uuid())
+  sessionId        String         @unique @map("session_id") // e.g. SESSION_A1B2C3D4
+  testId           String         @map("test_id")
+  participantId    String?        @map("participant_id")
+  participant      Participant?   @relation(fields: [participantId], references: [id], onDelete: SetNull)
+  startTime        DateTime       @map("start_time")
+  endTime          DateTime?      @map("end_time")
+  orientation      String         @default("portrait")
+  deviceModel      String?        @map("device_model")
+  availableSensors String?        @map("available_sensors")
+  status           String         @default("PENDING") // PENDING, COMPLETED, SYNCED
+  createdAt        DateTime       @default(now()) @map("created_at")
+  events           ActionEvent[]
+  sensorSamples    SensorSample[]
+
+  @@map("sessions")
+}
+
+model ActionEvent {
+  id             String   @id @default(uuid())
+  eventId        BigInt   @unique @map("event_id") // Unique event ID for idempotency
+  sessionId      String   @map("session_id")
+  session        Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  timestamp      BigInt   // Wall-clock epoch ms
+  elapsedMs      BigInt   @map("elapsed_ms") // Monotonic elapsed ms
+  activity       String   // typing, gestures, scrolling, etc.
+  orientation    String
+  expectedAction String   @map("expected_action")
+  detectedAction String   @map("detected_action")
+  result         String   // successful, incorrect
+  attemptId      Int      @default(1) @map("attempt_id")
+  durationMs     BigInt   @default(0) @map("duration_ms")
+  touchInfo      String?  @default("") @map("touch_info")
+
+  @@map("action_events")
+}
+
+model SensorSample {
+  id            String   @id @default(uuid())
+  sessionId     String   @map("session_id")
+  session       Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  timestamp     BigInt
+  elapsedMs     BigInt   @map("elapsed_ms")
+  activity      String
+  accX          Float    @map("acc_x")
+  accY          Float    @map("acc_y")
+  accZ          Float    @map("acc_z")
+  gyroX         Float    @map("gyro_x")
+  gyroY         Float    @map("gyro_y")
+  gyroZ         Float    @map("gyro_z")
+  proximity     Float
+  accMagnitude  Float    @map("acc_magnitude")
+  gyroMagnitude Float    @map("gyro_magnitude")
+
+  @@map("sensor_samples")
+}
+
+model UploadBatch {
+  id         String   @id @default(uuid())
+  sessionId  String   @map("session_id")
+  batchIndex Int      @map("batch_index")
+  status     String   @default("RECEIVED")
+  receivedAt DateTime @default(now()) @map("received_at")
+
+  @@map("upload_batches")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  adminId   String?  @map("admin_id")
+  action    String
+  details   String?
+  ipAddress String?  @map("ip_address")
+  timestamp DateTime @default(now())
+
+  @@map("audit_logs")
+}

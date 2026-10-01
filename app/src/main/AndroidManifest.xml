@@ -1,12 +1,16 @@
+
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Required for the foreground-service notification -->
+    <!-- Required for foreground notification -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
-    <!-- Required for foreground services that perform sensor/data collection -->
+    <!-- Required for foreground services performing sensor/data collection -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <!-- Required for posting notifications on Android 13+ (API 33+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -23,6 +27,7 @@
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.AdaptIQ"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:windowSoftInputMode="adjustResize">
 
             <intent-filter>
@@ -38,6 +43,7 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

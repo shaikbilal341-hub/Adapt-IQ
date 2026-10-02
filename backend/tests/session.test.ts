@@ -5,7 +5,7 @@ import request from 'supertest';
 import bcrypt from 'bcrypt';
 import app from '../src/server';
 import prisma from '../src/config/database';
-import { generateParticipantToken, generateAdminToken } from '../src/middleware/auth.middleware';
+import { generateSessionToken, generateAdminToken } from '../src/middleware/auth.middleware';
 
 describe('Adapt-IQ Backend API Integration Tests', () => {
     let participantToken: string;
@@ -32,21 +32,22 @@ describe('Adapt-IQ Backend API Integration Tests', () => {
         });
 
         adminToken = generateAdminToken('admin-uuid-1', 'RESEARCHER');
-        participantToken = generateParticipantToken('TEST_001');
+        participantToken = generateSessionToken(testSessionId, 'PARTICIPANT_TEST_001');
     });
 
     afterAll(async () => {
         await prisma.$disconnect();
     });
 
-    test('1. Participant Authentication & Token Generation', async () => {
+    test('1. Anonymous Participant Session Start & Token Generation', async () => {
         const res = await request(app)
-            .post('/api/v1/auth/participant')
-            .send({ testId: 'TEST_001' });
+            .post('/api/v1/auth/participant/session/start')
+            .send({ participantType: 'ADULT', condition: 'SITTING', ageGroup: '18-25' });
 
-        expect(res.status).toBe(200);
+        expect(res.status).toBe(201);
         expect(res.body).toHaveProperty('token');
-        expect(res.body.testId).toBe('TEST_001');
+        expect(res.body).toHaveProperty('sessionId');
+        expect(res.body).toHaveProperty('testId');
     });
 
     test('2. Register Research Session', async () => {
@@ -55,10 +56,10 @@ describe('Adapt-IQ Backend API Integration Tests', () => {
             .set('Authorization', `Bearer ${participantToken}`)
             .send({
                 sessionId: testSessionId,
-                testId: 'TEST_001',
+                testId: 'PARTICIPANT_TEST_001',
                 startTime: new Date().toISOString(),
                 orientation: 'portrait',
-                deviceModel: 'Test Device'
+                deviceModel: 'Normalized Device'
             });
 
         expect(res.status).toBe(201);

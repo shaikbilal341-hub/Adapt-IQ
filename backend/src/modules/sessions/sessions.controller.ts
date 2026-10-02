@@ -1,12 +1,12 @@
 import { Router, Response } from 'express';
 import prisma from '../../config/database';
-import { authenticateToken, requireRole, AuthenticatedRequest } from '../../middleware/auth.middleware';
+import { authenticateToken, requireRole, verifySessionOwnership, AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { sessionRegisterSchema, sessionFinalizeSchema, sessionUploadSchema } from '../../validators/session.validator';
 
 const router = Router();
 
 // Register session metadata (App 1)
-router.post('/', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/', authenticateToken, verifySessionOwnership, async (req: AuthenticatedRequest, res: Response) => {
     try {
         const data = sessionRegisterSchema.parse(req.body);
 
@@ -42,12 +42,13 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res: Respo
 
         return res.status(201).json({ message: 'Session registered', sessionId: session.sessionId });
     } catch (error: any) {
+        console.error("Error in session register:", error);
         return res.status(400).json({ error: error.message });
     }
 });
 
 // Finalize session (App 1)
-router.post('/:sessionId/finalize', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/:sessionId/finalize', authenticateToken, verifySessionOwnership, async (req: AuthenticatedRequest, res: Response) => {
     try {
         const { sessionId } = req.params;
         const data = sessionFinalizeSchema.parse(req.body);
@@ -62,12 +63,13 @@ router.post('/:sessionId/finalize', authenticateToken, async (req: Authenticated
 
         return res.json({ message: 'Session finalized', sessionId: session.sessionId, status: session.status });
     } catch (error: any) {
+        console.error("Error in session finalize:", error);
         return res.status(400).json({ error: error.message });
     }
 });
 
 // Idempotent batch upload (App 1)
-router.post('/:sessionId/upload', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/:sessionId/upload', authenticateToken, verifySessionOwnership, async (req: AuthenticatedRequest, res: Response) => {
     try {
         const { sessionId } = req.params;
         const uploadData = sessionUploadSchema.parse(req.body);
@@ -140,6 +142,7 @@ router.post('/:sessionId/upload', authenticateToken, async (req: AuthenticatedRe
             sensorsProcessed: uploadData.sensorSamples.length
         });
     } catch (error: any) {
+        console.error("Error in session upload:", error);
         return res.status(400).json({ error: error.message });
     }
 });
@@ -157,6 +160,24 @@ router.get('/', authenticateToken, requireRole('RESEARCHER'), async (req: Authen
         });
         return res.json(sessions);
     } catch (error: any) {
+        console.error("Error in admin list sessions:", error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin export dataset (App 2)
+router.get('/admin/export', authenticateToken, requireRole('RESEARCHER'), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        const sessions = await prisma.session.findMany({
+            include: {
+                events: true,
+                sensorSamples: true
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+        return res.json({ exportedAt: new Date().toISOString(), totalSessions: sessions.length, sessions });
+    } catch (error: any) {
+        console.error("Error in admin export:", error);
         return res.status(500).json({ error: error.message });
     }
 });
@@ -177,8 +198,26 @@ router.get('/:sessionId', authenticateToken, requireRole('RESEARCHER'), async (r
             return res.status(404).json({ error: 'Session not found' });
         }
 
-        return res.json(session);
+        // Serialize BigInt to string for JSON serialization compatibility
+        const serialized = {
+            ...session,
+            events: session.events.map(ev => ({
+                ...ev,
+                eventId: ev.eventId.toString(),
+                timestamp: ev.timestamp.toString(),
+                elapsedMs: ev.elapsedMs.toString(),
+                durationMs: ev.durationMs.toString()
+            })),
+            sensorSamples: session.sensorSamples.map(s => ({
+                ...s,
+                timestamp: s.timestamp.toString(),
+                elapsedMs: s.elapsedMs.toString()
+            }))
+        };
+
+        return res.json(serialized);
     } catch (error: any) {
+        console.error("Error in admin session detail:", error);
         return res.status(500).json({ error: error.message });
     }
 });

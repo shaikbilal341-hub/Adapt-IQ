@@ -9,8 +9,18 @@ import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Path
 
-data class ParticipantAuthRequest(val testId: String)
-data class ParticipantAuthResponse(val token: String, val testId: String)
+data class ParticipantSessionStartRequest(
+    @SerializedName("participantType") val participantType: String,
+    @SerializedName("condition") val condition: String,
+    @SerializedName("ageGroup") val ageGroup: String,
+    @SerializedName("deviceModel") val deviceModel: String
+)
+
+data class ParticipantSessionStartResponse(
+    @SerializedName("sessionId") val sessionId: String,
+    @SerializedName("testId") val testId: String,
+    @SerializedName("token") val token: String
+)
 
 data class RegisterSessionRequest(
     @SerializedName("sessionId") val sessionId: String,
@@ -61,8 +71,8 @@ data class UploadBatchRequest(
 )
 
 interface AdaptIqApi {
-    @POST("api/v1/auth/participant")
-    suspend fun registerParticipant(@Body request: ParticipantAuthRequest): Response<ParticipantAuthResponse>
+    @POST("api/v1/auth/participant/session/start")
+    suspend fun startParticipantSession(@Body request: ParticipantSessionStartRequest): Response<ParticipantSessionStartResponse>
 
     @POST("api/v1/sessions")
     suspend fun registerSession(
@@ -86,7 +96,7 @@ interface AdaptIqApi {
 }
 
 object AdaptIqHttpClient {
-    private const val BASE_URL = "https://adapt-iq-backend.example.org/" // Configurable production/staging URL
+    private const val BASE_URL = "https://adapt-iq-backend.example.org/"
 
     val api: AdaptIqApi by lazy {
         Retrofit.Builder()

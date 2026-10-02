@@ -1,5 +1,6 @@
 package com.example.adaptiq.admin.sync
 
+import com.google.gson.JsonObject
 import com.google.gson.annotations.SerializedName
 import retrofit2.Response
 import retrofit2.Retrofit
@@ -90,6 +91,9 @@ interface AdminApi {
         @Header("Authorization") token: String,
         @Path("sessionId") sessionId: String
     ): Response<SessionDetailDto>
+
+    @GET("api/v1/sessions/admin/export")
+    suspend fun exportDataset(@Header("Authorization") token: String): Response<JsonObject>
 }
 
 object AdminApiClient {

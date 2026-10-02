@@ -34,12 +34,19 @@ import java.util.UUID
 
 private enum class Screen {
     HOME,
-    TEST_SETUP,
+    TAP_PRECISION,
+    REACTION_TIME,
     TYPING,
     GESTURES,
     SCROLLING,
-    GAMING,
+    DRAG_DROP,
+    TARGET_TRACKING,
+    SLIDER_CONTROL,
+    VISUAL_SEARCH,
+    NAVIGATION,
+    MULTI_TOUCH,
     MIXED_INTERACTION,
+    GAMING,
     PREVIOUS_SESSIONS,
     EXPORT_DATASET
 }
@@ -55,17 +62,25 @@ class MainActivity : ComponentActivity() {
 
     private var currentScreen by mutableStateOf(Screen.HOME)
 
-    // Session State
-    private var testId by mutableStateOf("TEST_001")
+    // Session State (Pseudonymous and Automated)
+    private var testId by mutableStateOf("PARTICIPANT_TEMP")
     private var sessionId by mutableStateOf("")
     private var isSessionActive by mutableStateOf(false)
 
-    // Activity Status tracking
+    // Activity Status tracking (13 Activities)
+    private var tapPrecisionStatus by mutableStateOf(ActivityStatus.NOT_STARTED)
+    private var reactionTimeStatus by mutableStateOf(ActivityStatus.NOT_STARTED)
     private var typingStatus by mutableStateOf(ActivityStatus.NOT_STARTED)
     private var gestureStatus by mutableStateOf(ActivityStatus.NOT_STARTED)
     private var scrollStatus by mutableStateOf(ActivityStatus.NOT_STARTED)
-    private var gamingStatus by mutableStateOf(ActivityStatus.NOT_STARTED)
+    private var dragDropStatus by mutableStateOf(ActivityStatus.NOT_STARTED)
+    private var targetTrackingStatus by mutableStateOf(ActivityStatus.NOT_STARTED)
+    private var sliderControlStatus by mutableStateOf(ActivityStatus.NOT_STARTED)
+    private var visualSearchStatus by mutableStateOf(ActivityStatus.NOT_STARTED)
+    private var navigationStatus by mutableStateOf(ActivityStatus.NOT_STARTED)
+    private var multiTouchStatus by mutableStateOf(ActivityStatus.NOT_STARTED)
     private var mixedStatus by mutableStateOf(ActivityStatus.NOT_STARTED)
+    private var gamingStatus by mutableStateOf(ActivityStatus.NOT_STARTED)
 
     private var lastCsvPath by mutableStateOf<String?>(null)
 
@@ -90,61 +105,70 @@ class MainActivity : ComponentActivity() {
     private fun AdaptIQAppRouter() {
         when (currentScreen) {
             Screen.HOME -> HomeScreen()
-            Screen.TEST_SETUP -> TestSetupScreen()
+            Screen.TAP_PRECISION -> TapPrecisionActivityScreen(
+                onLogEvent = { exp, det, res, att, dur, touch -> logActionEvent("tap_precision", exp, det, res, att, dur, touch) },
+                onActivityCompleted = { tapPrecisionStatus = ActivityStatus.COMPLETED; currentScreen = Screen.HOME; checkSessionCompletion(); showToast("Tap Precision Completed") },
+                onBack = { currentScreen = Screen.HOME }
+            )
+            Screen.REACTION_TIME -> ReactionTimeActivityScreen(
+                onLogEvent = { exp, det, res, att, dur, touch -> logActionEvent("reaction_time", exp, det, res, att, dur, touch) },
+                onActivityCompleted = { reactionTimeStatus = ActivityStatus.COMPLETED; currentScreen = Screen.HOME; checkSessionCompletion(); showToast("Reaction Time Completed") },
+                onBack = { currentScreen = Screen.HOME }
+            )
             Screen.TYPING -> TypingActivityScreen(
                 testId = testId,
-                onLogEvent = { exp, det, res, att, dur, touch ->
-                    logActionEvent("typing", exp, det, res, att, dur, touch)
-                },
-                onActivityCompleted = {
-                    typingStatus = ActivityStatus.COMPLETED
-                    currentScreen = Screen.HOME
-                    showToast("Typing Activity Completed")
-                },
+                onLogEvent = { exp, det, res, att, dur, touch -> logActionEvent("typing", exp, det, res, att, dur, touch) },
+                onActivityCompleted = { typingStatus = ActivityStatus.COMPLETED; currentScreen = Screen.HOME; checkSessionCompletion(); showToast("Typing Activity Completed") },
                 onBack = { currentScreen = Screen.HOME }
             )
             Screen.GESTURES -> GestureActivityScreen(
-                onLogEvent = { exp, det, res, att, dur, touch ->
-                    logActionEvent("gestures", exp, det, res, att, dur, touch)
-                },
-                onActivityCompleted = {
-                    gestureStatus = ActivityStatus.COMPLETED
-                    currentScreen = Screen.HOME
-                    showToast("Gesture Activity Completed")
-                },
+                onLogEvent = { exp, det, res, att, dur, touch -> logActionEvent("gestures", exp, det, res, att, dur, touch) },
+                onActivityCompleted = { gestureStatus = ActivityStatus.COMPLETED; currentScreen = Screen.HOME; checkSessionCompletion(); showToast("Gesture Activity Completed") },
                 onBack = { currentScreen = Screen.HOME }
             )
             Screen.SCROLLING -> ScrollingActivityScreen(
-                onLogEvent = { exp, det, res, att, dur, touch ->
-                    logActionEvent("scrolling", exp, det, res, att, dur, touch)
-                },
-                onActivityCompleted = {
-                    scrollStatus = ActivityStatus.COMPLETED
-                    currentScreen = Screen.HOME
-                    showToast("Scrolling Activity Completed")
-                },
+                onLogEvent = { exp, det, res, att, dur, touch -> logActionEvent("scrolling", exp, det, res, att, dur, touch) },
+                onActivityCompleted = { scrollStatus = ActivityStatus.COMPLETED; currentScreen = Screen.HOME; checkSessionCompletion(); showToast("Scrolling Activity Completed") },
                 onBack = { currentScreen = Screen.HOME }
             )
-            Screen.GAMING -> GamingActivityScreen(
-                onLogEvent = { exp, det, res, att, dur, touch ->
-                    logActionEvent("gaming", exp, det, res, att, dur, touch)
-                },
-                onActivityCompleted = {
-                    gamingStatus = ActivityStatus.COMPLETED
-                    currentScreen = Screen.HOME
-                    showToast("Gaming Activity Completed")
-                },
+            Screen.DRAG_DROP -> DragAndDropActivityScreen(
+                onLogEvent = { exp, det, res, att, dur, touch -> logActionEvent("drag_drop", exp, det, res, att, dur, touch) },
+                onActivityCompleted = { dragDropStatus = ActivityStatus.COMPLETED; currentScreen = Screen.HOME; checkSessionCompletion(); showToast("Drag & Drop Completed") },
+                onBack = { currentScreen = Screen.HOME }
+            )
+            Screen.TARGET_TRACKING -> TargetTrackingActivityScreen(
+                onLogEvent = { exp, det, res, att, dur, touch -> logActionEvent("target_tracking", exp, det, res, att, dur, touch) },
+                onActivityCompleted = { targetTrackingStatus = ActivityStatus.COMPLETED; currentScreen = Screen.HOME; checkSessionCompletion(); showToast("Target Tracking Completed") },
+                onBack = { currentScreen = Screen.HOME }
+            )
+            Screen.SLIDER_CONTROL -> SliderControlActivityScreen(
+                onLogEvent = { exp, det, res, att, dur, touch -> logActionEvent("slider_control", exp, det, res, att, dur, touch) },
+                onActivityCompleted = { sliderControlStatus = ActivityStatus.COMPLETED; currentScreen = Screen.HOME; checkSessionCompletion(); showToast("Slider Control Completed") },
+                onBack = { currentScreen = Screen.HOME }
+            )
+            Screen.VISUAL_SEARCH -> VisualSearchActivityScreen(
+                onLogEvent = { exp, det, res, att, dur, touch -> logActionEvent("visual_search", exp, det, res, att, dur, touch) },
+                onActivityCompleted = { visualSearchStatus = ActivityStatus.COMPLETED; currentScreen = Screen.HOME; checkSessionCompletion(); showToast("Visual Search Completed") },
+                onBack = { currentScreen = Screen.HOME }
+            )
+            Screen.NAVIGATION -> NavigationTaskActivityScreen(
+                onLogEvent = { exp, det, res, att, dur, touch -> logActionEvent("navigation", exp, det, res, att, dur, touch) },
+                onActivityCompleted = { navigationStatus = ActivityStatus.COMPLETED; currentScreen = Screen.HOME; checkSessionCompletion(); showToast("Navigation Task Completed") },
+                onBack = { currentScreen = Screen.HOME }
+            )
+            Screen.MULTI_TOUCH -> MultiTouchActivityScreen(
+                onLogEvent = { exp, det, res, att, dur, touch -> logActionEvent("multi_touch", exp, det, res, att, dur, touch) },
+                onActivityCompleted = { multiTouchStatus = ActivityStatus.COMPLETED; currentScreen = Screen.HOME; checkSessionCompletion(); showToast("Multi-Touch Completed") },
                 onBack = { currentScreen = Screen.HOME }
             )
             Screen.MIXED_INTERACTION -> MixedInteractionScreen(
-                onLogEvent = { exp, det, res, att, dur, touch ->
-                    logActionEvent("mixed_interaction", exp, det, res, att, dur, touch)
-                },
-                onActivityCompleted = {
-                    mixedStatus = ActivityStatus.COMPLETED
-                    currentScreen = Screen.HOME
-                    showToast("Mixed Interaction Completed")
-                },
+                onLogEvent = { exp, det, res, att, dur, touch -> logActionEvent("mixed_interaction", exp, det, res, att, dur, touch) },
+                onActivityCompleted = { mixedStatus = ActivityStatus.COMPLETED; currentScreen = Screen.HOME; checkSessionCompletion(); showToast("Mixed Interaction Completed") },
+                onBack = { currentScreen = Screen.HOME }
+            )
+            Screen.GAMING -> GamingActivityScreen(
+                onLogEvent = { exp, det, res, att, dur, touch -> logActionEvent("gaming", exp, det, res, att, dur, touch) },
+                onActivityCompleted = { gamingStatus = ActivityStatus.COMPLETED; currentScreen = Screen.HOME; checkSessionCompletion(); showToast("Gaming Interaction Completed") },
                 onBack = { currentScreen = Screen.HOME }
             )
             Screen.PREVIOUS_SESSIONS -> PreviousSessionsScreen()
@@ -154,9 +178,13 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun HomeScreen() {
-        val completedCount = listOf(typingStatus, gestureStatus, scrollStatus, gamingStatus, mixedStatus)
-            .count { it == ActivityStatus.COMPLETED }
-        val totalActivities = 5
+        val statuses = listOf(
+            tapPrecisionStatus, reactionTimeStatus, typingStatus, gestureStatus, scrollStatus,
+            dragDropStatus, targetTrackingStatus, sliderControlStatus, visualSearchStatus,
+            navigationStatus, multiTouchStatus, mixedStatus, gamingStatus
+        )
+        val completedCount = statuses.count { it == ActivityStatus.COMPLETED }
+        val totalActivities = 13
         val sessionProgress = completedCount.toFloat() / totalActivities.toFloat()
 
         Column(
@@ -173,26 +201,26 @@ class MainActivity : ComponentActivity() {
             )
 
             Text(
-                text = "User Interaction Data Collection",
+                text = "Participant Research Battery ($completedCount of $totalActivities Completed)",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary
             )
 
-            // Test Session Info Card
+            // Pseudonymous Session Info Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "TEST ID: $testId",
+                        text = "PARTICIPANT ID: $testId",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Sensors: ${availableSensorCount()}/3 Ready • Storage: Local CSV",
+                        text = "Zero PII • Encrypted Local Storage • Secure Sync",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                     )
@@ -205,7 +233,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Session Progress", style = MaterialTheme.typography.labelLarge)
+                    Text("Study Progress", style = MaterialTheme.typography.labelLarge)
                     Text("$completedCount / $totalActivities Completed", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                 }
                 LinearProgressIndicator(
@@ -220,52 +248,33 @@ class MainActivity : ComponentActivity() {
 
             if (!isSessionActive) {
                 Button(
-                    onClick = {
-                        startNewSession()
-                        currentScreen = Screen.TEST_SETUP
-                    },
+                    onClick = { startNewPseudonymousSession() },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("START SESSION", fontWeight = FontWeight.Bold)
+                    Text("START RESEARCH STUDY", fontWeight = FontWeight.Bold)
                 }
             }
 
             Text(
-                text = "Research Activities",
+                text = "Research Activities (13 Battery)",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
 
-            // Activity Cards
-            ActivityCard("Typing", typingStatus) {
-                ensureSessionStarted()
-                typingStatus = ActivityStatus.IN_PROGRESS
-                currentScreen = Screen.TYPING
-            }
-
-            ActivityCard("Gestures", gestureStatus) {
-                ensureSessionStarted()
-                gestureStatus = ActivityStatus.IN_PROGRESS
-                currentScreen = Screen.GESTURES
-            }
-
-            ActivityCard("Scrolling", scrollStatus) {
-                ensureSessionStarted()
-                scrollStatus = ActivityStatus.IN_PROGRESS
-                currentScreen = Screen.SCROLLING
-            }
-
-            ActivityCard("Gaming", gamingStatus) {
-                ensureSessionStarted()
-                gamingStatus = ActivityStatus.IN_PROGRESS
-                currentScreen = Screen.GAMING
-            }
-
-            ActivityCard("Mixed Interaction", mixedStatus) {
-                ensureSessionStarted()
-                mixedStatus = ActivityStatus.IN_PROGRESS
-                currentScreen = Screen.MIXED_INTERACTION
-            }
+            // 13 Activity Cards
+            ActivityCard("1. Tap Precision", tapPrecisionStatus) { ensureSessionStarted(); currentScreen = Screen.TAP_PRECISION }
+            ActivityCard("2. Reaction Time", reactionTimeStatus) { ensureSessionStarted(); currentScreen = Screen.REACTION_TIME }
+            ActivityCard("3. Typing", typingStatus) { ensureSessionStarted(); currentScreen = Screen.TYPING }
+            ActivityCard("4. Swipe / Gesture", gestureStatus) { ensureSessionStarted(); currentScreen = Screen.GESTURES }
+            ActivityCard("5. Scrolling", scrollStatus) { ensureSessionStarted(); currentScreen = Screen.SCROLLING }
+            ActivityCard("6. Drag & Drop", dragDropStatus) { ensureSessionStarted(); currentScreen = Screen.DRAG_DROP }
+            ActivityCard("7. Target Tracking", targetTrackingStatus) { ensureSessionStarted(); currentScreen = Screen.TARGET_TRACKING }
+            ActivityCard("8. Slider Control", sliderControlStatus) { ensureSessionStarted(); currentScreen = Screen.SLIDER_CONTROL }
+            ActivityCard("9. Visual Search", visualSearchStatus) { ensureSessionStarted(); currentScreen = Screen.VISUAL_SEARCH }
+            ActivityCard("10. Navigation Task", navigationStatus) { ensureSessionStarted(); currentScreen = Screen.NAVIGATION }
+            ActivityCard("11. Multi-Touch", multiTouchStatus) { ensureSessionStarted(); currentScreen = Screen.MULTI_TOUCH }
+            ActivityCard("12. Mixed Interaction", mixedStatus) { ensureSessionStarted(); currentScreen = Screen.MIXED_INTERACTION }
+            ActivityCard("13. Gaming-style Interaction", gamingStatus) { ensureSessionStarted(); currentScreen = Screen.GAMING }
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -351,34 +360,6 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun TestSetupScreen() {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text("Test Session Setup", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text("Enter anonymous research test identifier.")
-
-            OutlinedTextField(
-                value = testId,
-                onValueChange = { testId = it.trim() },
-                label = { Text("Test ID") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Button(
-                onClick = { currentScreen = Screen.HOME },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Confirm & Continue")
-            }
-        }
-    }
-
-    @Composable
     private fun PreviousSessionsScreen() {
         val sessions = getSavedSessions()
 
@@ -438,15 +419,26 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun startNewSession() {
-        sessionId = "SESSION_" + UUID.randomUUID().toString().replace("-", "").take(8).uppercase(Locale.US)
+    private fun startNewPseudonymousSession() {
+        val randomHex = UUID.randomUUID().toString().replace("-", "").take(6).uppercase(Locale.US)
+        val sessionHex = UUID.randomUUID().toString().replace("-", "").take(8).uppercase(Locale.US)
+        testId = "PARTICIPANT_$randomHex"
+        sessionId = "SESSION_$sessionHex"
         isSessionActive = true
 
+        tapPrecisionStatus = ActivityStatus.NOT_STARTED
+        reactionTimeStatus = ActivityStatus.NOT_STARTED
         typingStatus = ActivityStatus.NOT_STARTED
         gestureStatus = ActivityStatus.NOT_STARTED
         scrollStatus = ActivityStatus.NOT_STARTED
-        gamingStatus = ActivityStatus.NOT_STARTED
+        dragDropStatus = ActivityStatus.NOT_STARTED
+        targetTrackingStatus = ActivityStatus.NOT_STARTED
+        sliderControlStatus = ActivityStatus.NOT_STARTED
+        visualSearchStatus = ActivityStatus.NOT_STARTED
+        navigationStatus = ActivityStatus.NOT_STARTED
+        multiTouchStatus = ActivityStatus.NOT_STARTED
         mixedStatus = ActivityStatus.NOT_STARTED
+        gamingStatus = ActivityStatus.NOT_STARTED
 
         val intent = Intent(this, RecordingService::class.java).apply {
             action = RecordingService.ACTION_START
@@ -456,11 +448,30 @@ class MainActivity : ComponentActivity() {
         }
 
         ContextCompat.startForegroundService(this, intent)
+        showToast("Research Study Started ($testId)")
     }
 
     private fun ensureSessionStarted() {
-        if (!isSessionActive) {
-            startNewSession()
+        if (!isSessionActive || sessionId.isBlank()) {
+            startNewPseudonymousSession()
+        }
+    }
+
+    private fun checkSessionCompletion() {
+        val statuses = listOf(
+            tapPrecisionStatus, reactionTimeStatus, typingStatus, gestureStatus, scrollStatus,
+            dragDropStatus, targetTrackingStatus, sliderControlStatus, visualSearchStatus,
+            navigationStatus, multiTouchStatus, mixedStatus, gamingStatus
+        )
+        val completedCount = statuses.count { it == ActivityStatus.COMPLETED }
+        if (completedCount == 13) {
+            val intent = Intent(this, RecordingService::class.java).apply {
+                action = RecordingService.ACTION_STOP
+            }
+            startService(intent)
+            isSessionActive = false
+            loadLastCsv()
+            showToast("Study Completed Successfully! All 13 Activities Saved Locally.")
         }
     }
 
@@ -485,19 +496,6 @@ class MainActivity : ComponentActivity() {
             putExtra(RecordingService.EXTRA_ORIENTATION, if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) "landscape" else "portrait")
         }
         startService(intent)
-    }
-
-    private fun sensorAvailability(): List<Boolean> {
-        val manager = getSystemService(SENSOR_SERVICE) as SensorManager
-        return listOf(
-            manager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null,
-            manager.getDefaultSensor(Sensor.TYPE_GYROSCOPE) != null,
-            manager.getDefaultSensor(Sensor.TYPE_PROXIMITY) != null
-        )
-    }
-
-    private fun availableSensorCount(): Int {
-        return sensorAvailability().count { it }
     }
 
     private fun datasetsDirectory(): File {

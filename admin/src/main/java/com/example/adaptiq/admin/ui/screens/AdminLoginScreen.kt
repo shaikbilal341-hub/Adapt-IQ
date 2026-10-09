@@ -23,7 +23,7 @@ import kotlinx.coroutines.withContext
 fun AdminLoginScreen(
     onLoginSuccess: (String) -> Unit
 ) {
-    var email by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("nandakishore.christ@gmail.com") }
     var password by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }

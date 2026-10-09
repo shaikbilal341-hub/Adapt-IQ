@@ -6,8 +6,10 @@
 
     <application
         android:allowBackup="false"
+        android:icon="@android:drawable/ic_menu_info_details"
         android:label="Adapt-IQ Admin"
         android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
         android:theme="@style/Theme.AdaptIQ">
 
         <activity

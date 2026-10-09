@@ -96,7 +96,9 @@ interface AdaptIqApi {
 }
 
 object AdaptIqHttpClient {
-    private const val BASE_URL = "https://adapt-iq-backend.example.org/"
+    // 10.0.2.2 points to host machine localhost from Android Emulator.
+    // For physical mobile phone testing over USB, run: adb reverse tcp:4000 tcp:4000
+    private const val BASE_URL = "http://10.0.2.2:4000/"
 
     val api: AdaptIqApi by lazy {
         Retrofit.Builder()

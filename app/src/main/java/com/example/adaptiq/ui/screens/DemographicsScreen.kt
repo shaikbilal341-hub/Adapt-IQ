@@ -3,26 +3,25 @@ package com.example.adaptiq.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
 @Composable
 fun DemographicsScreen(
-    onSubmitDemographics: (ageGroup: String, gender: String, participantType: String) -> Unit,
+    onSubmitDemographics: (ageYears: Int, gender: String, participantType: String) -> Unit,
     onBack: () -> Unit
 ) {
-    val ageGroups = listOf("Under 18", "18–25", "26–40", "41–60", "60+")
     val genders = listOf("Female", "Male", "Non-binary", "Prefer not to say")
-    val participantTypes = listOf("ADULT", "CHILD", "UNKNOWN")
 
-    var selectedAgeGroup by remember { mutableStateOf("") }
+    var ageInput by remember { mutableStateOf("") }
     var selectedGender by remember { mutableStateOf("") }
-    var selectedParticipantType by remember { mutableStateOf("ADULT") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     Surface(
@@ -42,7 +41,7 @@ fun DemographicsScreen(
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
-            Text("Please provide the minimum required demographic information for this research study.")
+            Text("Please enter your age in completed years and select your gender.")
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -53,20 +52,14 @@ fun DemographicsScreen(
                     modifier = Modifier.padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Text("Select Age Group:", fontWeight = FontWeight.Bold)
-                    ageGroups.forEach { age ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            RadioButton(
-                                selected = selectedAgeGroup == age,
-                                onClick = { selectedAgeGroup = age; errorMessage = null }
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(age)
-                        }
-                    }
+                    OutlinedTextField(
+                        value = ageInput,
+                        onValueChange = { ageInput = it; errorMessage = null },
+                        label = { Text("Age in Years (e.g. 25)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
                     Spacer(modifier = Modifier.height(4.dp))
                     Text("Select Gender:", fontWeight = FontWeight.Bold)
@@ -101,11 +94,17 @@ fun DemographicsScreen(
 
             Button(
                 onClick = {
-                    if (selectedAgeGroup.isBlank() || selectedGender.isBlank()) {
-                        errorMessage = "Please select both your age group and gender to proceed."
+                    val ageInt = ageInput.toIntOrNull()
+                    if (ageInt == null || ageInt < 1 || ageInt > 120) {
+                        errorMessage = "Please enter a valid age in years (between 1 and 120)."
                         return@Button
                     }
-                    onSubmitDemographics(selectedAgeGroup, selectedGender, selectedParticipantType)
+                    if (selectedGender.isBlank()) {
+                        errorMessage = "Please select your gender to proceed."
+                        return@Button
+                    }
+                    val participantType = if (ageInt < 18) "CHILD" else "ADULT"
+                    onSubmitDemographics(ageInt, selectedGender, participantType)
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {

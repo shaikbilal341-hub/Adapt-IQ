@@ -65,9 +65,9 @@ class RecordingService : Service(), SensorEventListener {
 
     private var testId = "TEST_001"
 
-    private var ageGroup = "" // Explicitly uncollected/missing unless provided
+    private var ageYears = 18
 
-    private var gender = "" // Explicitly uncollected/missing unless provided
+    private var gender = "Prefer not to say"
 
     private var sessionName = "Adapt-IQ Research Session"
 
@@ -102,7 +102,7 @@ class RecordingService : Service(), SensorEventListener {
 
         const val EXTRA_TEST_ID = "test_id"
 
-        const val EXTRA_AGE_GROUP = "age_group"
+        const val EXTRA_AGE_YEARS = "age_years"
 
         const val EXTRA_GENDER = "gender"
 
@@ -148,9 +148,9 @@ class RecordingService : Service(), SensorEventListener {
         private const val NOTIFICATION_ID = 1001
 
         /**
-         * Easy Analysis CSV Header matching Phase 8.3.4 Specification (Exactly 25 columns)
+         * Easy Analysis CSV Header matching Phase 8.4 Specification (Using Age_Years)
          */
-        const val EASY_ANALYSIS_HEADER = "Age_Group,Gender,Session_Name,Participant_ID,Session_ID,Activity_Name,Game_Mode,Trial_ID,Event_ID,Timestamp_UTC,Elapsed_Time_ms,Expected_Action,Detected_Action,Outcome,Response_Latency_ms,Touch_Info,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z,proximity,acc_magnitude,gyro_magnitude"
+        const val EASY_ANALYSIS_HEADER = "Age_Years,Gender,Session_Name,Participant_ID,Session_ID,Activity_Name,Game_Mode,Trial_ID,Event_ID,Timestamp_UTC,Elapsed_Time_ms,Expected_Action,Detected_Action,Outcome,Response_Latency_ms,Touch_Info,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z,proximity,acc_magnitude,gyro_magnitude"
 
         /**
          * Legacy 22-column CSV Header for backward compatibility
@@ -183,9 +183,9 @@ class RecordingService : Service(), SensorEventListener {
 
                 testId = intent.getStringExtra(EXTRA_TEST_ID) ?: "TEST_001"
 
-                ageGroup = intent.getStringExtra(EXTRA_AGE_GROUP) ?: "NA"
+                ageYears = intent.getIntExtra(EXTRA_AGE_YEARS, 18)
 
-                gender = intent.getStringExtra(EXTRA_GENDER) ?: "NA"
+                gender = intent.getStringExtra(EXTRA_GENDER) ?: "Prefer not to say"
 
                 sessionName = intent.getStringExtra(EXTRA_SESSION_NAME) ?: "Adapt-IQ Research Session"
 
@@ -229,7 +229,7 @@ class RecordingService : Service(), SensorEventListener {
 
                     val attempt = intent.getIntExtra(EXTRA_ATTEMPT_ID, 1)
 
-                    val dur = intent.getLongExtra(EXTRA_DURATION, -1L) // -1L indicates unmeasured / missing response latency
+                    val dur = intent.getLongExtra(EXTRA_DURATION, -1L)
 
                     val touch = intent.getStringExtra(EXTRA_TOUCH_INFO) ?: ""
 
@@ -402,11 +402,10 @@ class RecordingService : Service(), SensorEventListener {
         val gyroMag = sqrt((gyroX * gyroX) + (gyroY * gyroY) + (gyroZ * gyroZ))
         val eventId = eventSequence.incrementAndGet()
 
-        // Exactly 25 columns matching EASY_ANALYSIS_HEADER
         val row = String.format(
             Locale.US,
-            "%s,%s,%s,%s,%s,%s,%s,0,%d,%d,%d,none,sensor_sample,none,NA,\"\",%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f",
-            csv(ageGroup),
+            "%d,%s,%s,%s,%s,%s,%s,0,%d,%d,%d,none,sensor_sample,none,NA,\"\",%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f",
+            ageYears,
             csv(gender),
             csv(sessionName),
             csv(testId),
@@ -448,11 +447,10 @@ class RecordingService : Service(), SensorEventListener {
         val timestamp = System.currentTimeMillis()
         val latencyStr = if (durationMs < 0L) "NA" else durationMs.toString()
 
-        // Exactly 25 columns matching EASY_ANALYSIS_HEADER
         val row = String.format(
             Locale.US,
-            "%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%d,%s,%s,%s,%s,%s,NA,NA,NA,NA,NA,NA,NA,NA,NA",
-            csv(ageGroup),
+            "%d,%s,%s,%s,%s,%s,%s,%d,%d,%d,%d,%s,%s,%s,%s,%s,NA,NA,NA,NA,NA,NA,NA,NA,NA",
+            ageYears,
             csv(gender),
             csv(sessionName),
             csv(testId),

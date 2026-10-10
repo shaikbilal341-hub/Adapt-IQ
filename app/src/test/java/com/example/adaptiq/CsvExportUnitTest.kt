@@ -10,7 +10,7 @@ class CsvExportUnitTest {
         val header = RecordingService.EASY_ANALYSIS_HEADER
         val columns = header.split(",")
         assertEquals(25, columns.size)
-        assertEquals("Age_Group", columns[0])
+        assertEquals("Age_Years", columns[0])
         assertEquals("Gender", columns[1])
         assertEquals("Session_Name", columns[2])
         assertEquals("Participant_ID", columns[3])
@@ -33,10 +33,8 @@ class CsvExportUnitTest {
 
     @Test
     fun testCsvParsingAndEscapingCompliance() {
-        // Test standard CSV parsing rules for quoted fields, commas, and newlines
-        val sampleRow = "\"18–25\",\"Prefer not to say\",\"Adapt-IQ Research Session\",\"PARTICIPANT_A1B2C3\",\"SESSION_9F8E7D\",\"tap_precision\",\"standard\",1,101,1717942800000,1250,\"tap_target\",\"tap_target\",\"successful\",145,\"x=120.5, y=340.2\",NA,NA,NA,NA,NA,NA,NA,NA,NA"
+        val sampleRow = "25,\"Prefer not to say\",\"Adapt-IQ Research Session\",\"PARTICIPANT_A1B2C3\",\"SESSION_9F8E7D\",\"tap_precision\",\"standard\",1,101,1717942800000,1250,\"tap_target\",\"tap_target\",\"successful\",145,\"x=120.5, y=340.2\",NA,NA,NA,NA,NA,NA,NA,NA,NA"
         
-        // Simple robust CSV line parser for testing
         val fields = mutableListOf<String>()
         val cur = StringBuilder()
         var inQuotes = false
@@ -65,7 +63,7 @@ class CsvExportUnitTest {
         fields.add(cur.toString())
 
         assertEquals(25, fields.size)
-        assertEquals("18–25", fields[0])
+        assertEquals("25", fields[0])
         assertEquals("Prefer not to say", fields[1])
         assertEquals("Adapt-IQ Research Session", fields[2])
         assertEquals("x=120.5, y=340.2", fields[15])

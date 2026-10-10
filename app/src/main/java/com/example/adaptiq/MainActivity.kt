@@ -2,8 +2,6 @@ package com.example.adaptiq
 
 import android.content.Intent
 import android.content.res.Configuration
-import android.hardware.Sensor
-import android.hardware.SensorManager
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
@@ -75,7 +73,7 @@ class MainActivity : ComponentActivity() {
     private var sessionId by mutableStateOf("")
     private var sessionToken by mutableStateOf("")
     private var isSessionActive by mutableStateOf(false)
-    private var currentAgeGroup by mutableStateOf("18–25")
+    private var currentAgeYears by mutableIntStateOf(25)
     private var currentGender by mutableStateOf("Prefer not to say")
 
     // Activity Status tracking (13 Activities)
@@ -100,6 +98,10 @@ class MainActivity : ComponentActivity() {
 
         loadLastCsv()
 
+        val prefs = getSharedPreferences(RecordingService.PREFS_NAME, MODE_PRIVATE)
+        val consentAccepted = prefs.getBoolean("consent_accepted", false)
+        currentScreen = if (consentAccepted) Screen.HOME else Screen.WELCOME
+
         setContent {
             AdaptIQTheme {
                 Surface(
@@ -122,18 +124,24 @@ class MainActivity : ComponentActivity() {
                 onViewPrivacy = { currentScreen = Screen.CONSENT }
             )
             Screen.CONSENT -> ConsentScreen(
-                onAgree = { currentScreen = Screen.DEMOGRAPHICS },
+                onAgree = {
+                    getSharedPreferences(RecordingService.PREFS_NAME, MODE_PRIVATE)
+                        .edit()
+                        .putBoolean("consent_accepted", true)
+                        .apply()
+                    currentScreen = Screen.HOME
+                },
                 onBack = { currentScreen = Screen.WELCOME }
             )
             Screen.DEMOGRAPHICS -> DemographicsScreen(
-                onSubmitDemographics = { ageGroup, gender, participantType ->
-                    currentAgeGroup = ageGroup
+                onSubmitDemographics = { ageYears, gender, participantType ->
+                    currentAgeYears = ageYears
                     currentGender = gender
                     coroutineScope.launch {
-                        startBackendPseudonymousSession(ageGroup, gender, participantType)
+                        startBackendPseudonymousSession(ageYears, gender, participantType)
                     }
                 },
-                onBack = { currentScreen = Screen.CONSENT }
+                onBack = { currentScreen = Screen.HOME }
             )
             Screen.HOME -> HomeScreen()
             Screen.TAP_PRECISION -> TapPrecisionActivityScreen(
@@ -237,6 +245,16 @@ class MainActivity : ComponentActivity() {
                 color = MaterialTheme.colorScheme.primary
             )
 
+            // Primary Action 1: Proceed to Test / Demographics
+            if (!isSessionActive) {
+                Button(
+                    onClick = { currentScreen = Screen.DEMOGRAPHICS },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("PROCEED TO TEST", fontWeight = FontWeight.Bold)
+                }
+            }
+
             // Pseudonymous Session Info Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -310,11 +328,12 @@ class MainActivity : ComponentActivity() {
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            // Primary Action 2: Previous Test Data
             OutlinedButton(
                 onClick = { currentScreen = Screen.PREVIOUS_SESSIONS },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Export Partial / Local Dataset")
+                Text("Previous Test Data")
             }
 
             OutlinedButton(
@@ -402,8 +421,8 @@ class MainActivity : ComponentActivity() {
                 .fillMaxSize()
                 .padding(20.dp)
         ) {
-            Text("Local Dataset Export", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text("Export partial or completed CSV sessions locally stored on device.")
+            Text("Previous Test Data", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text("View and export previous research sessions and local CSV records.")
             Spacer(modifier = Modifier.height(12.dp))
 
             if (sessions.isEmpty()) {
@@ -462,14 +481,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private suspend fun startBackendPseudonymousSession(ageGroup: String, gender: String, participantType: String) {
+    private suspend fun startBackendPseudonymousSession(ageYears: Int, gender: String, participantType: String) {
+        val ageGroupStr = if (ageYears < 18) "Under 18" else if (ageYears <= 25) "18–25" else if (ageYears <= 40) "26–40" else if (ageYears <= 60) "41–60" else "60+"
         try {
             val response = withContext(Dispatchers.IO) {
                 AdaptIqHttpClient.api.startParticipantSession(
                     ParticipantSessionStartRequest(
                         participantType = participantType,
                         condition = "SITTING",
-                        ageGroup = ageGroup,
+                        ageGroup = ageGroupStr,
                         deviceModel = "Normalized Device"
                     )
                 )
@@ -499,7 +519,7 @@ class MainActivity : ComponentActivity() {
                     action = RecordingService.ACTION_START
                     putExtra(RecordingService.EXTRA_SESSION_ID, sessionId)
                     putExtra(RecordingService.EXTRA_TEST_ID, testId)
-                    putExtra(RecordingService.EXTRA_AGE_GROUP, currentAgeGroup)
+                    putExtra(RecordingService.EXTRA_AGE_YEARS, currentAgeYears)
                     putExtra(RecordingService.EXTRA_GENDER, currentGender)
                     putExtra(RecordingService.EXTRA_SESSION_NAME, "Adapt-IQ Research Session")
                 }
@@ -548,7 +568,7 @@ class MainActivity : ComponentActivity() {
             action = RecordingService.ACTION_START
             putExtra(RecordingService.EXTRA_SESSION_ID, sessionId)
             putExtra(RecordingService.EXTRA_TEST_ID, testId)
-            putExtra(RecordingService.EXTRA_AGE_GROUP, currentAgeGroup)
+            putExtra(RecordingService.EXTRA_AGE_YEARS, currentAgeYears)
             putExtra(RecordingService.EXTRA_GENDER, currentGender)
             putExtra(RecordingService.EXTRA_SESSION_NAME, "Adapt-IQ Research Session")
         }

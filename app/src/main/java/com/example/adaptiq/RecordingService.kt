@@ -148,9 +148,9 @@ class RecordingService : Service(), SensorEventListener {
         private const val NOTIFICATION_ID = 1001
 
         /**
-         * Easy Analysis CSV Header matching Phase 8.3.2 Specification (using Age_Group)
+         * Easy Analysis CSV Header matching Phase 8.3.3 Specification (including Touch_Info)
          */
-        const val EASY_ANALYSIS_HEADER = "Age_Group,Gender,Session_Name,Participant_ID,Session_ID,Activity_Name,Game_Mode,Trial_ID,Event_ID,Timestamp_UTC,Elapsed_Time_ms,Expected_Action,Detected_Action,Outcome,Response_Latency_ms,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z,proximity,acc_magnitude,gyro_magnitude"
+        const val EASY_ANALYSIS_HEADER = "Age_Group,Gender,Session_Name,Participant_ID,Session_ID,Activity_Name,Game_Mode,Trial_ID,Event_ID,Timestamp_UTC,Elapsed_Time_ms,Expected_Action,Detected_Action,Outcome,Response_Latency_ms,Touch_Info,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z,proximity,acc_magnitude,gyro_magnitude"
     }
 
     override fun onCreate() {
@@ -226,6 +226,8 @@ class RecordingService : Service(), SensorEventListener {
 
                     val dur = intent.getLongExtra(EXTRA_DURATION, 0L)
 
+                    val touch = intent.getStringExtra(EXTRA_TOUCH_INFO) ?: ""
+
                     val act = intent.getStringExtra(EXTRA_ACTIVITY) ?: activity
 
                     val elapsed = SystemClock.elapsedRealtime() - recordingStartTime
@@ -238,7 +240,8 @@ class RecordingService : Service(), SensorEventListener {
                         detectedAction = detAction,
                         result = res,
                         attemptId = attempt,
-                        durationMs = dur
+                        durationMs = dur,
+                        touchInfo = touch
                     )
                 }
             }
@@ -394,10 +397,10 @@ class RecordingService : Service(), SensorEventListener {
         val gyroMag = sqrt((gyroX * gyroX) + (gyroY * gyroY) + (gyroZ * gyroZ))
         val eventId = eventSequence.incrementAndGet()
 
-        // Easy Analysis row format: Age_Group,Gender,Session_Name,Participant_ID,Session_ID,Activity_Name,Game_Mode,Trial_ID,Event_ID,Timestamp_UTC,Elapsed_Time_ms,Expected_Action,Detected_Action,Outcome,Response_Latency_ms,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z,proximity,acc_magnitude,gyro_magnitude
+        // 24 columns total matching EASY_ANALYSIS_HEADER
         val row = String.format(
             Locale.US,
-            "%s,%s,%s,%s,%s,%s,%s,0,%d,%d,%d,none,sensor_sample,none,NA,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f",
+            "%s,%s,%s,%s,%s,%s,%s,0,%d,%d,%d,none,sensor_sample,none,0,\"\",%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f",
             csv(ageGroup),
             csv(gender),
             csv(sessionName),
@@ -432,16 +435,17 @@ class RecordingService : Service(), SensorEventListener {
         detectedAction: String,
         result: String,
         attemptId: Int,
-        durationMs: Long
+        durationMs: Long,
+        touchInfo: String
     ) {
         val writer = csvWriter ?: return
 
         val timestamp = System.currentTimeMillis()
 
-        // Easy Analysis row format with proper missing-value handling (NA for inapplicable sensor fields)
+        // 24 columns total matching EASY_ANALYSIS_HEADER
         val row = String.format(
             Locale.US,
-            "%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%d,%s,%s,%s,%d,NA,NA,NA,NA,NA,NA,NA,NA,NA",
+            "%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%d,%s,%s,%s,%d,%s,NA,NA,NA,NA,NA,NA,NA,NA,NA",
             csv(ageGroup),
             csv(gender),
             csv(sessionName),
@@ -456,7 +460,8 @@ class RecordingService : Service(), SensorEventListener {
             csv(expectedAction),
             csv(detectedAction),
             csv(result),
-            durationMs
+            durationMs,
+            csv(touchInfo)
         )
 
         synchronized(writer) {

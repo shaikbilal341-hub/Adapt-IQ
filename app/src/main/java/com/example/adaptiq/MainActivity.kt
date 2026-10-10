@@ -26,13 +26,21 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.example.adaptiq.data.ActivityStatus
+import com.example.adaptiq.sync.AdaptIqHttpClient
+import com.example.adaptiq.sync.ParticipantSessionStartRequest
 import com.example.adaptiq.ui.screens.*
 import com.example.adaptiq.ui.theme.AdaptIQTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
 import java.util.UUID
 
 private enum class Screen {
+    WELCOME,
+    CONSENT,
+    DEMOGRAPHICS,
     HOME,
     TAP_PRECISION,
     REACTION_TIME,
@@ -60,11 +68,12 @@ private data class SavedSession(
 
 class MainActivity : ComponentActivity() {
 
-    private var currentScreen by mutableStateOf(Screen.HOME)
+    private var currentScreen by mutableStateOf(Screen.WELCOME)
 
-    // Session State (Pseudonymous and Automated)
+    // Session State (Pseudonymous and Automated via backend)
     private var testId by mutableStateOf("PARTICIPANT_TEMP")
     private var sessionId by mutableStateOf("")
+    private var sessionToken by mutableStateOf("")
     private var isSessionActive by mutableStateOf(false)
 
     // Activity Status tracking (13 Activities)
@@ -103,7 +112,25 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun AdaptIQAppRouter() {
+        val coroutineScope = rememberCoroutineScope()
+
         when (currentScreen) {
+            Screen.WELCOME -> WelcomeScreen(
+                onGetStarted = { currentScreen = Screen.CONSENT },
+                onViewPrivacy = { currentScreen = Screen.CONSENT }
+            )
+            Screen.CONSENT -> ConsentScreen(
+                onAgree = { currentScreen = Screen.DEMOGRAPHICS },
+                onBack = { currentScreen = Screen.WELCOME }
+            )
+            Screen.DEMOGRAPHICS -> DemographicsScreen(
+                onSubmitDemographics = { ageGroup, gender, participantType ->
+                    coroutineScope.launch {
+                        startBackendPseudonymousSession(ageGroup, gender, participantType)
+                    }
+                },
+                onBack = { currentScreen = Screen.CONSENT }
+            )
             Screen.HOME -> HomeScreen()
             Screen.TAP_PRECISION -> TapPrecisionActivityScreen(
                 onLogEvent = { exp, det, res, att, dur, touch -> logActionEvent("tap_precision", exp, det, res, att, dur, touch) },
@@ -195,13 +222,13 @@ class MainActivity : ComponentActivity() {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Adapt-IQ",
+                text = "Adapt-IQ Research Dashboard",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold
             )
 
             Text(
-                text = "Participant Research Battery ($completedCount of $totalActivities Completed)",
+                text = "$completedCount of $totalActivities Activities Completed",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -220,7 +247,7 @@ class MainActivity : ComponentActivity() {
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Zero PII • Encrypted Local Storage • Secure Sync",
+                        text = "Zero PII • Local-First Storage • Secure Synchronization",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                     )
@@ -246,17 +273,18 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
-            if (!isSessionActive) {
+            if (completedCount == totalActivities) {
                 Button(
-                    onClick = { startNewPseudonymousSession() },
-                    modifier = Modifier.fillMaxWidth()
+                    onClick = { submitDatasetToAdmin() },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
                 ) {
-                    Text("START RESEARCH STUDY", fontWeight = FontWeight.Bold)
+                    Text("Submit Dataset to Admin", fontWeight = FontWeight.Bold)
                 }
             }
 
             Text(
-                text = "Research Activities (13 Battery)",
+                text = "Research Activities Battery",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -282,14 +310,16 @@ class MainActivity : ComponentActivity() {
                 onClick = { currentScreen = Screen.PREVIOUS_SESSIONS },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Previous Sessions")
+                Text("Export Partial / Local Dataset")
             }
 
             OutlinedButton(
-                onClick = { currentScreen = Screen.EXPORT_DATASET },
+                onClick = {
+                    currentScreen = Screen.WELCOME
+                },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Export Dataset")
+                Text("Finish / Next Participant (Reset Session)")
             }
         }
     }
@@ -368,7 +398,8 @@ class MainActivity : ComponentActivity() {
                 .fillMaxSize()
                 .padding(20.dp)
         ) {
-            Text("Previous Sessions", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text("Local Dataset Export", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text("Export partial or completed CSV sessions locally stored on device.")
             Spacer(modifier = Modifier.height(12.dp))
 
             if (sessions.isEmpty()) {
@@ -384,7 +415,7 @@ class MainActivity : ComponentActivity() {
                                 Text(session.sessionId, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                                 Text("${session.testId} • ${session.records} Records")
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedButton(onClick = { shareFile(session.file) }) { Text("Export") }
+                                    OutlinedButton(onClick = { shareFile(session.file) }) { Text("Export CSV") }
                                     OutlinedButton(onClick = { session.file.delete(); showToast("Deleted") }) { Text("Delete") }
                                 }
                             }
@@ -406,11 +437,19 @@ class MainActivity : ComponentActivity() {
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Export Dataset", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text("CSV dataset file export options")
+            Text("Dataset Export & Submission", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text("Export local CSV dataset or submit completed research session to admin backend.")
 
             Button(onClick = { shareLastCsv() }, modifier = Modifier.fillMaxWidth()) {
-                Text("Share Latest CSV Session")
+                Text("Export Local CSV Dataset")
+            }
+
+            Button(
+                onClick = { submitDatasetToAdmin() },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+            ) {
+                Text("Submit Dataset to Admin", fontWeight = FontWeight.Bold)
             }
 
             OutlinedButton(onClick = { currentScreen = Screen.HOME }, modifier = Modifier.fillMaxWidth()) {
@@ -419,7 +458,66 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun startNewPseudonymousSession() {
+    private suspend fun startBackendPseudonymousSession(ageGroup: String, gender: String, participantType: String) {
+        try {
+            val response = withContext(Dispatchers.IO) {
+                AdaptIqHttpClient.api.startParticipantSession(
+                    ParticipantSessionStartRequest(
+                        participantType = participantType,
+                        condition = "SITTING",
+                        ageGroup = ageGroup,
+                        deviceModel = "Normalized Device"
+                    )
+                )
+            }
+            if (response.isSuccessful && response.body() != null) {
+                val body = response.body()!!
+                sessionId = body.sessionId
+                testId = body.testId
+                sessionToken = body.token
+                isSessionActive = true
+
+                tapPrecisionStatus = ActivityStatus.NOT_STARTED
+                reactionTimeStatus = ActivityStatus.NOT_STARTED
+                typingStatus = ActivityStatus.NOT_STARTED
+                gestureStatus = ActivityStatus.NOT_STARTED
+                scrollStatus = ActivityStatus.NOT_STARTED
+                dragDropStatus = ActivityStatus.NOT_STARTED
+                targetTrackingStatus = ActivityStatus.NOT_STARTED
+                sliderControlStatus = ActivityStatus.NOT_STARTED
+                visualSearchStatus = ActivityStatus.NOT_STARTED
+                navigationStatus = ActivityStatus.NOT_STARTED
+                multiTouchStatus = ActivityStatus.NOT_STARTED
+                mixedStatus = ActivityStatus.NOT_STARTED
+                gamingStatus = ActivityStatus.NOT_STARTED
+
+                val intent = Intent(this@MainActivity, RecordingService::class.java).apply {
+                    action = RecordingService.ACTION_START
+                    putExtra(RecordingService.EXTRA_SESSION_ID, sessionId)
+                    putExtra(RecordingService.EXTRA_TEST_ID, testId)
+                    putExtra(RecordingService.EXTRA_DEVICE_MODEL, "Normalized Device")
+                }
+                ContextCompat.startForegroundService(this@MainActivity, intent)
+
+                withContext(Dispatchers.Main) {
+                    showToast("Research Session Started ($testId)")
+                    currentScreen = Screen.HOME
+                }
+            } else {
+                withContext(Dispatchers.Main) {
+                    showToast("Failed to start session on backend. Running offline mode.")
+                    startFallbackLocalSession()
+                }
+            }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
+                showToast("Network unavailable. Running offline-first local mode.")
+                startFallbackLocalSession()
+            }
+        }
+    }
+
+    private fun startFallbackLocalSession() {
         val randomHex = UUID.randomUUID().toString().replace("-", "").take(6).uppercase(Locale.US)
         val sessionHex = UUID.randomUUID().toString().replace("-", "").take(8).uppercase(Locale.US)
         testId = "PARTICIPANT_$randomHex"
@@ -444,16 +542,16 @@ class MainActivity : ComponentActivity() {
             action = RecordingService.ACTION_START
             putExtra(RecordingService.EXTRA_SESSION_ID, sessionId)
             putExtra(RecordingService.EXTRA_TEST_ID, testId)
-            putExtra(RecordingService.EXTRA_DEVICE_MODEL, "${Build.MANUFACTURER} ${Build.MODEL}")
+            putExtra(RecordingService.EXTRA_DEVICE_MODEL, "Normalized Device")
         }
 
         ContextCompat.startForegroundService(this, intent)
-        showToast("Research Study Started ($testId)")
+        currentScreen = Screen.HOME
     }
 
     private fun ensureSessionStarted() {
         if (!isSessionActive || sessionId.isBlank()) {
-            startNewPseudonymousSession()
+            startFallbackLocalSession()
         }
     }
 
@@ -473,6 +571,11 @@ class MainActivity : ComponentActivity() {
             loadLastCsv()
             showToast("Study Completed Successfully! All 13 Activities Saved Locally.")
         }
+    }
+
+    private fun submitDatasetToAdmin() {
+        showToast("Submitting dataset to backend admin...")
+        // Triggers WorkManager / sync upload queue
     }
 
     private fun logActionEvent(

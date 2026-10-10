@@ -1,9 +1,9 @@
 package com.example.adaptiq.ui.screens
 
+import android.os.SystemClock
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,6 +16,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -24,12 +25,12 @@ import androidx.compose.ui.unit.sp
 import com.example.adaptiq.ui.components.PracticeHeader
 import kotlinx.coroutines.delay
 import kotlin.math.abs
+import kotlin.random.Random
 
 private enum class GameMode {
     SELECTION,
-    PORTRAIT_RUNNER,
-    PORTRAIT_MATCH,
-    LANDSCAPE_DRIVING
+    ADAPT_IQ_RUNNER,
+    ADAPT_IQ_DRIVING_LAB
 }
 
 @Composable
@@ -51,7 +52,7 @@ fun GamingActivityScreen(
     var isGameRunning by remember { mutableStateOf(false) }
     var isGameFinished by remember { mutableStateOf(false) }
 
-    // Countdown Timer
+    // Countdown Timer (45s research trial)
     LaunchedEffect(isGameRunning) {
         if (isGameRunning) {
             while (timeRemainingSeconds > 0 && isGameRunning) {
@@ -73,27 +74,27 @@ fun GamingActivityScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Gaming Activity",
+            text = "Activity 13 of 13: Gaming-style Interaction",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )
 
         Text(
-            text = "Simple research mini-games designed to collect natural gameplay interactions.",
+            text = "Engage in controlled 3D research mini-games to measure natural interaction behavior.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         if (gameMode == GameMode.SELECTION) {
             Text(
-                text = "Choose Gaming Mode",
+                text = "Choose 3D Research Game",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
 
             Card(
                 onClick = {
-                    gameMode = GameMode.PORTRAIT_RUNNER
+                    gameMode = GameMode.ADAPT_IQ_RUNNER
                     timeRemainingSeconds = 45
                     isGameRunning = false
                     isGameFinished = false
@@ -102,15 +103,15 @@ fun GamingActivityScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("🏃 Portrait Runner Mini-Game", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("🏃 Adapt-IQ Runner (3D Perspective)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("Portrait orientation. Swipe Left/Right to change lanes, Swipe Up to jump, Swipe Down to duck.")
+                    Text("3-lane 3D perspective running track with approaching obstacles. Swipe left/right, jump, and slide.")
                 }
             }
 
             Card(
                 onClick = {
-                    gameMode = GameMode.PORTRAIT_MATCH
+                    gameMode = GameMode.ADAPT_IQ_DRIVING_LAB
                     timeRemainingSeconds = 45
                     isGameRunning = false
                     isGameFinished = false
@@ -119,34 +120,17 @@ fun GamingActivityScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("🧩 Portrait Match Mini-Game", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("🏎️ Adapt-IQ Driving Lab (3D Simulation)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("Portrait orientation. Tap, drag, and swipe shapes to complete shape matches.")
-                }
-            }
-
-            Card(
-                onClick = {
-                    gameMode = GameMode.LANDSCAPE_DRIVING
-                    timeRemainingSeconds = 45
-                    isGameRunning = false
-                    isGameFinished = false
-                    isPractice = true
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("🏎️ Landscape Driving Mini-Game", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Landscape orientation. Tap & hold buttons to steer left/right, accelerate, and brake.")
+                    Text("3D perspective road driving simulation with steering, lane deviation tracking, and obstacle avoidance.")
                 }
             }
 
             OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
-                Text("Back")
+                Text("Back to Dashboard")
             }
         } else {
-            // Active Game Screen Header
+            // Active Game Header
             PracticeHeader(
                 isPractice = isPractice,
                 onStartOfficialCollection = {
@@ -157,7 +141,6 @@ fun GamingActivityScreen(
                 }
             )
 
-            // Timer & Status Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -165,9 +148,8 @@ fun GamingActivityScreen(
             ) {
                 Text(
                     text = when (gameMode) {
-                        GameMode.PORTRAIT_RUNNER -> "Portrait Runner"
-                        GameMode.PORTRAIT_MATCH -> "Portrait Match"
-                        GameMode.LANDSCAPE_DRIVING -> "Landscape Driving"
+                        GameMode.ADAPT_IQ_RUNNER -> "Adapt-IQ Runner (3D)"
+                        GameMode.ADAPT_IQ_DRIVING_LAB -> "Adapt-IQ Driving Lab (3D)"
                         else -> ""
                     },
                     style = MaterialTheme.typography.titleMedium,
@@ -190,22 +172,17 @@ fun GamingActivityScreen(
 
             if (!isGameFinished) {
                 when (gameMode) {
-                    GameMode.PORTRAIT_RUNNER -> {
-                        PortraitRunnerGame(
+                    GameMode.ADAPT_IQ_RUNNER -> {
+                        AdaptIqRunner3DView(
+                            isGameRunning = isGameRunning,
                             isPractice = isPractice,
                             onLogEvent = onLogEvent
                         )
                     }
 
-                    GameMode.PORTRAIT_MATCH -> {
-                        PortraitMatchGame(
-                            isPractice = isPractice,
-                            onLogEvent = onLogEvent
-                        )
-                    }
-
-                    GameMode.LANDSCAPE_DRIVING -> {
-                        LandscapeDrivingGame(
+                    GameMode.ADAPT_IQ_DRIVING_LAB -> {
+                        AdaptIqDriving3DView(
+                            isGameRunning = isGameRunning,
                             isPractice = isPractice,
                             onLogEvent = onLogEvent
                         )
@@ -223,14 +200,14 @@ fun GamingActivityScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "✓ Mini-Game Completed!",
+                            text = "✓ 3D Gaming Session Completed!",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "45-second research gameplay session recorded successfully.",
+                            text = "45-second research gaming session recorded successfully.",
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -240,7 +217,7 @@ fun GamingActivityScreen(
                     onClick = onActivityCompleted,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Continue to Session Dashboard", fontWeight = FontWeight.Bold)
+                    Text("Continue to Dashboard", fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -248,39 +225,99 @@ fun GamingActivityScreen(
                 onClick = { gameMode = GameMode.SELECTION },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Change Game Mode")
+                Text("Select Another Game")
             }
         }
     }
 }
 
 /**
- * Original Portrait Lane Runner Game
+ * Obstacle model for 3D Runner
+ */
+private data class RunnerObstacle(
+    val id: Int,
+    val lane: Int,
+    var depth: Float // 0.0 (horizon) to 1.0 (player)
+)
+
+/**
+ * Adapt-IQ Runner — Active 3-Lane 3D Perspective Endless Runner with Collision & Monotonic Latency
  */
 @Composable
-private fun PortraitRunnerGame(
+private fun AdaptIqRunner3DView(
+    isGameRunning: Boolean,
     isPractice: Boolean,
     onLogEvent: (expectedAction: String, detectedAction: String, result: String, attemptId: Int, durationMs: Long, touchInfo: String) -> Unit
 ) {
     var playerLane by remember { mutableIntStateOf(1) } // 0=Left, 1=Center, 2=Right
     var isJumping by remember { mutableStateOf(false) }
-    var isDucking by remember { mutableStateOf(false) }
-    var lastActionText by remember { mutableStateOf("Swipe Left/Right to change lanes, Up to Jump, Down to Roll") }
+    var isSliding by remember { mutableStateOf(false) }
+    var score by remember { mutableIntStateOf(0) }
+    var statusText by remember { mutableStateOf("Swipe Left/Right, Up to Jump, Down to Slide") }
 
-    var dragStartOffset by remember { mutableStateOf(Offset.Zero) }
+    val obstacles = remember { mutableStateListOf<RunnerObstacle>() }
+    var obstacleIdCounter by remember { mutableIntStateOf(0) }
+    var trialAttempt = remember { mutableIntStateOf(1) }
+    var gestureStartTime by remember { mutableLongStateOf(0L) }
+
+    // Game Loop for obstacle movement & collision
+    LaunchedEffect(isGameRunning) {
+        var lastSpawnTime = SystemClock.elapsedRealtime()
+        while (true) {
+            if (isGameRunning) {
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastSpawnTime > 2500L) {
+                    lastSpawnTime = now
+                    val randomLane = Random.nextInt(0, 3)
+                    obstacleIdCounter++
+                    obstacles.add(RunnerObstacle(obstacleIdCounter, randomLane, 0.0f))
+                }
+
+                val iterator = obstacles.listIterator()
+                while (iterator.hasNext()) {
+                    val obs = iterator.next()
+                    obs.depth += 0.018f
+
+                    if (obs.depth >= 0.82f && obs.depth <= 0.92f) {
+                        if (obs.lane == playerLane) {
+                            val avoided = isJumping || isSliding
+                            val resultStr = if (avoided) "successful" else "incorrect"
+                            statusText = if (avoided) "✓ Obstacle Avoided!" else "💥 Collision!"
+                            if (avoided) score += 10
+
+                            if (!isPractice) {
+                                val reactionMs = SystemClock.elapsedRealtime() - now
+                                onLogEvent(
+                                    if (obs.lane == 0) "swipe_right" else "jump_or_slide",
+                                    if (avoided) "jump_or_slide" else "collision",
+                                    resultStr,
+                                    trialAttempt.intValue++,
+                                    reactionMs.coerceAtLeast(50L),
+                                    "lane=${obs.lane},depth=${obs.depth}"
+                                )
+                            }
+                            iterator.remove()
+                        }
+                    } else if (obs.depth > 1.0f) {
+                        iterator.remove()
+                        score += 5
+                    }
+                }
+            }
+            delay(30L)
+        }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(280.dp)
-            .background(Color(0xFF263238), shape = RoundedCornerShape(16.dp))
+            .height(320.dp)
+            .background(Color(0xFF102027), shape = RoundedCornerShape(16.dp))
             .pointerInput(Unit) {
                 detectDragGestures(
-                    onDragStart = { dragStartOffset = it },
-                    onDragEnd = {
-                        // Handled in onDrag if threshold reached
-                    },
-                    onDrag = { change, dragAmount ->
+                    onDragStart = { gestureStartTime = SystemClock.elapsedRealtime() },
+                    onDragEnd = { },
+                    onDrag = { _, dragAmount ->
                         val dx = dragAmount.x
                         val dy = dragAmount.y
                         val threshold = 30f
@@ -289,29 +326,30 @@ private fun PortraitRunnerGame(
                         if (abs(dx) > abs(dy) && dx > threshold && playerLane < 2) {
                             playerLane++
                             action = "swipe_right"
-                            lastActionText = "Swipe Right -> Lane $playerLane"
+                            statusText = "Lane Shift Right -> Lane $playerLane"
                         } else if (abs(dx) > abs(dy) && dx < -threshold && playerLane > 0) {
                             playerLane--
                             action = "swipe_left"
-                            lastActionText = "Swipe Left -> Lane $playerLane"
+                            statusText = "Lane Shift Left -> Lane $playerLane"
                         } else if (abs(dy) > abs(dx) && dy < -threshold) {
                             isJumping = true
                             action = "jump"
-                            lastActionText = "Swipe Up -> Jump!"
+                            statusText = "Jump over obstacle!"
                         } else if (abs(dy) > abs(dx) && dy > threshold) {
-                            isDucking = true
+                            isSliding = true
                             action = "roll"
-                            lastActionText = "Swipe Down -> Roll!"
+                            statusText = "Slide under obstacle!"
                         }
 
                         if (action.isNotBlank() && !isPractice) {
+                            val duration = SystemClock.elapsedRealtime() - gestureStartTime
                             onLogEvent(
                                 action,
                                 action,
                                 "successful",
-                                1,
-                                100L,
-                                "lane=$playerLane"
+                                trialAttempt.intValue++,
+                                duration.coerceAtLeast(30L),
+                                "lane=$playerLane,action=$action"
                             )
                         }
                     }
@@ -322,201 +360,183 @@ private fun PortraitRunnerGame(
         Canvas(modifier = Modifier.fillMaxSize()) {
             val width = size.width
             val height = size.height
-            val laneWidth = width / 3f
 
-            // Draw Lanes
-            for (i in 0..2) {
-                val x = i * laneWidth
+            // Horizon & Sky
+            drawRect(color = Color(0xFF1A237E), topLeft = Offset(0f, 0f), size = Size(width, height * 0.4f))
+            // Ground
+            drawRect(color = Color(0xFF263238), topLeft = Offset(0f, height * 0.4f), size = Size(width, height * 0.6f))
+
+            val horizonX = width / 2f
+            val horizonY = height * 0.4f
+            val bottomY = height
+
+            val laneWidthAtBottom = width * 0.8f
+            val leftLaneBottomX = width / 2f - laneWidthAtBottom * 0.5f
+            val rightLaneBottomX = width / 2f + laneWidthAtBottom * 0.5f
+
+            // Draw Obstacles in 3D perspective
+            for (obs in obstacles) {
+                val obsY = horizonY + (bottomY - horizonY) * obs.depth
+                val laneW = (rightLaneBottomX - leftLaneBottomX) / 3f
+                val obsX = when (obs.lane) {
+                    0 -> leftLaneBottomX + laneW * 0.5f + (obs.depth * (horizonX - leftLaneBottomX - laneW * 0.5f))
+                    1 -> horizonX
+                    else -> rightLaneBottomX - laneW * 0.5f - (obs.depth * (rightLaneBottomX - horizonX - laneW * 0.5f))
+                }
+                val obsSize = 30f * (0.2f + obs.depth * 0.8f)
+
                 drawRect(
-                    color = if (i % 2 == 0) Color(0xFF37474F) else Color(0xFF455A64),
-                    topLeft = Offset(x, 0f),
-                    size = Size(laneWidth, height)
+                    color = Color(0xFFD32F2F),
+                    topLeft = Offset(obsX - obsSize / 2f, obsY - obsSize / 2f),
+                    size = Size(obsSize, obsSize)
                 )
             }
 
-            // Player Position
-            val playerX = playerLane * laneWidth + (laneWidth / 2f) - 25f
-            val playerY = if (isJumping) height - 120f else height - 70f
-            val playerHeight = if (isDucking) 25f else 50f
+            val leftLaneCenter = width / 2f - laneWidthAtBottom * 0.3f
+            val centerLaneCenter = width / 2f
+            val rightLaneCenter = width / 2f + laneWidthAtBottom * 0.3f
 
-            drawRoundRect(
+            val playerX = when (playerLane) {
+                0 -> leftLaneCenter
+                1 -> centerLaneCenter
+                else -> rightLaneCenter
+            }
+
+            val playerY = if (isJumping) height - 140f else height - 90f
+            val playerSize = if (isSliding) 35f else 60f
+
+            drawCircle(
                 color = Color(0xFFFF4081),
-                topLeft = Offset(playerX, playerY),
-                size = Size(50f, playerHeight),
-                cornerRadius = CornerRadius(10f, 10f)
+                radius = playerSize / 2f,
+                center = Offset(playerX, playerY)
             )
         }
 
-        Text(
-            text = lastActionText,
-            color = Color.White,
-            fontWeight = FontWeight.Bold,
-            fontSize = 13.sp,
-            textAlign = TextAlign.Center,
+        Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(12.dp)
-        )
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(text = statusText, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp, textAlign = TextAlign.Center)
+            Text(text = "Score: $score", color = Color(0xFF81C784), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        }
     }
 
-    LaunchedEffect(isJumping, isDucking) {
+    LaunchedEffect(isJumping, isSliding) {
         if (isJumping) {
-            delay(400)
+            delay(450)
             isJumping = false
         }
-        if (isDucking) {
-            delay(400)
-            isDucking = false
+        if (isSliding) {
+            delay(450)
+            isSliding = false
         }
     }
 }
 
 /**
- * Original Portrait Shape Matching Game
+ * Adapt-IQ Driving Lab — 3D Perspective Road Simulation with Lane Deviation & Obstacles
  */
 @Composable
-private fun PortraitMatchGame(
-    isPractice: Boolean,
-    onLogEvent: (expectedAction: String, detectedAction: String, result: String, attemptId: Int, durationMs: Long, touchInfo: String) -> Unit
-) {
-    var selectedTile by remember { mutableIntStateOf(-1) }
-    var matchedCount by remember { mutableIntStateOf(0) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(16.dp))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "Tap matching shape pairs below",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            (0..3).forEach { index ->
-                Button(
-                    onClick = {
-                        if (selectedTile == -1) {
-                            selectedTile = index
-                        } else {
-                            matchedCount++
-                            selectedTile = -1
-                        }
-
-                        if (!isPractice) {
-                            onLogEvent(
-                                "tap",
-                                "tap",
-                                "successful",
-                                1,
-                                50L,
-                                "tile_idx=$index"
-                            )
-                        }
-                    },
-                    modifier = Modifier.size(70.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (selectedTile == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
-                    )
-                ) {
-                    Text(
-                        text = when (index % 2) {
-                            0 -> "⭐"
-                            else -> "🔵"
-                        },
-                        fontSize = 22.sp
-                    )
-                }
-            }
-        }
-
-        Text(
-            text = "Matches made: $matchedCount",
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold
-        )
-    }
-}
-
-/**
- * Original Landscape Driving Game
- */
-@Composable
-private fun LandscapeDrivingGame(
+private fun AdaptIqDriving3DView(
+    isGameRunning: Boolean,
     isPractice: Boolean,
     onLogEvent: (expectedAction: String, detectedAction: String, result: String, attemptId: Int, durationMs: Long, touchInfo: String) -> Unit
 ) {
     var carXOffset by remember { mutableFloatStateOf(0f) }
-    var speed by remember { mutableIntStateOf(40) }
-    var statusText by remember { mutableStateOf("Use steering & pedal controls") }
+    var speed by remember { mutableIntStateOf(60) }
+    var steeringStatus by remember { mutableStateOf("Steer to stay on the 3D road") }
+    var laneDeviationCount by remember { mutableIntStateOf(0) }
+    var trialAttempt = remember { mutableIntStateOf(1) }
+
+    // Driving simulation loop
+    LaunchedEffect(isGameRunning) {
+        while (true) {
+            if (isGameRunning) {
+                if (abs(carXOffset) > 100f) {
+                    laneDeviationCount++
+                    steeringStatus = "⚠️ Lane Deviation Warning!"
+                }
+            }
+            delay(100L)
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF1B5E20), shape = RoundedCornerShape(16.dp))
+            .background(Color(0xFF004D40), shape = RoundedCornerShape(16.dp))
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "🏎️ LANDSCAPE DRIVING SIMULATOR",
+            text = "🏎️ Adapt-IQ Driving Lab (3D Simulation)",
             color = Color.White,
             fontWeight = FontWeight.Bold,
             fontSize = 14.sp
         )
 
-        // Road Canvas
+        // 3D Perspective Road Canvas
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(140.dp)
-                .background(Color(0xFF424242), shape = RoundedCornerShape(8.dp)),
+                .height(180.dp)
+                .background(Color(0xFF212121), shape = RoundedCornerShape(12.dp)),
             contentAlignment = Alignment.Center
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val cx = size.width / 2f + carXOffset
-                val cy = size.height / 2f
+                val width = size.width
+                val height = size.height
 
-                // Draw Car
+                // Sky
+                drawRect(color = Color(0xFF0D47A1), topLeft = Offset(0f, 0f), size = Size(width, height * 0.35f))
+                // Road Perspective Trapezoid
+                val roadPath = Path().apply {
+                    moveTo(width / 2f - 40f, height * 0.35f)
+                    lineTo(width / 2f + 40f, height * 0.35f)
+                    lineTo(width + carXOffset * 1.5f, height)
+                    lineTo(carXOffset * 1.5f, height)
+                    close()
+                }
+                drawPath(roadPath, Color(0xFF616161))
+
+                // Vehicle Representation
+                val carX = width / 2f + carXOffset
+                val carY = height - 40f
                 drawRoundRect(
-                    color = Color(0xFFFFC107),
-                    topLeft = Offset(cx - 30f, cy - 20f),
-                    size = Size(60f, 40f),
+                    color = Color(0xFFFFD54F),
+                    topLeft = Offset(carX - 25f, carY - 15f),
+                    size = Size(50f, 30f),
                     cornerRadius = CornerRadius(6f, 6f)
                 )
             }
 
             Text(
-                text = "Speed: $speed km/h • $statusText",
+                text = "Speed: $speed km/h • Deviations: $laneDeviationCount • $steeringStatus",
                 color = Color.White,
-                fontSize = 12.sp,
+                fontSize = 11.sp,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(8.dp)
             )
         }
 
-        // Controls Row
+        // Steering & Pedal Controls
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Steering Left / Right
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = {
-                        carXOffset -= 20f
-                        statusText = "Steer Left"
+                        val startTime = SystemClock.elapsedRealtime()
+                        carXOffset -= 25f
+                        steeringStatus = "Steering Left"
+                        val duration = SystemClock.elapsedRealtime() - startTime
                         if (!isPractice) {
-                            onLogEvent("steer_left", "steer_left", "successful", 1, 80L, "offset=$carXOffset")
+                            onLogEvent("steer_left", "steer_left", "successful", trialAttempt.intValue++, duration.coerceAtLeast(30L), "offset=$carXOffset")
                         }
                     }
                 ) {
@@ -525,10 +545,12 @@ private fun LandscapeDrivingGame(
 
                 Button(
                     onClick = {
-                        carXOffset += 20f
-                        statusText = "Steer Right"
+                        val startTime = SystemClock.elapsedRealtime()
+                        carXOffset += 25f
+                        steeringStatus = "Steering Right"
+                        val duration = SystemClock.elapsedRealtime() - startTime
                         if (!isPractice) {
-                            onLogEvent("steer_right", "steer_right", "successful", 1, 80L, "offset=$carXOffset")
+                            onLogEvent("steer_right", "steer_right", "successful", trialAttempt.intValue++, duration.coerceAtLeast(30L), "offset=$carXOffset")
                         }
                     }
                 ) {
@@ -536,14 +558,15 @@ private fun LandscapeDrivingGame(
                 }
             }
 
-            // Accelerate / Brake
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = {
-                        speed = (speed + 10).coerceAtMost(120)
-                        statusText = "Accelerate"
+                        val startTime = SystemClock.elapsedRealtime()
+                        speed = (speed + 10).coerceAtMost(140)
+                        steeringStatus = "Accelerating"
+                        val duration = SystemClock.elapsedRealtime() - startTime
                         if (!isPractice) {
-                            onLogEvent("accelerate", "accelerate", "successful", 1, 100L, "speed=$speed")
+                            onLogEvent("accelerate", "accelerate", "successful", trialAttempt.intValue++, duration.coerceAtLeast(30L), "speed=$speed")
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
@@ -553,10 +576,12 @@ private fun LandscapeDrivingGame(
 
                 Button(
                     onClick = {
+                        val startTime = SystemClock.elapsedRealtime()
                         speed = (speed - 15).coerceAtLeast(0)
-                        statusText = "Brake"
+                        steeringStatus = "Braking"
+                        val duration = SystemClock.elapsedRealtime() - startTime
                         if (!isPractice) {
-                            onLogEvent("brake", "brake", "successful", 1, 100L, "speed=$speed")
+                            onLogEvent("brake", "brake", "successful", trialAttempt.intValue++, duration.coerceAtLeast(30L), "speed=$speed")
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828))

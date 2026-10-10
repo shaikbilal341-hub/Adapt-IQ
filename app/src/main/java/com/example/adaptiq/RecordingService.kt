@@ -65,17 +65,11 @@ class RecordingService : Service(), SensorEventListener {
 
     private var testId = "TEST_001"
 
-    private var age = 0
-
-    private var ageGroup = ""
+    private var ageGroup = "Adult"
 
     private var gender = "Prefer not to say"
 
     private var sessionName = "Adapt-IQ Research Session"
-
-    private var participantType = "UNKNOWN"
-
-    private var condition = "SITTING"
 
     private var activity = "typing"
 
@@ -83,8 +77,6 @@ class RecordingService : Service(), SensorEventListener {
 
     @Volatile
     private var eventLabel = "SESSION_STARTED"
-
-    private var deviceModel = ""
 
     private var orientation = "portrait"
 
@@ -110,25 +102,17 @@ class RecordingService : Service(), SensorEventListener {
 
         const val EXTRA_TEST_ID = "test_id"
 
-        const val EXTRA_AGE = "age"
-
         const val EXTRA_AGE_GROUP = "age_group"
 
         const val EXTRA_GENDER = "gender"
 
         const val EXTRA_SESSION_NAME = "session_name"
 
-        const val EXTRA_USER_TYPE = "user_type"
-
-        const val EXTRA_CONDITION = "condition"
-
         const val EXTRA_ACTIVITY = "activity"
 
         const val EXTRA_GAME_MODE = "game_mode"
 
         const val EXTRA_EVENT_LABEL = "event_label"
-
-        const val EXTRA_DEVICE_MODEL = "device_model"
 
         const val EXTRA_ORIENTATION = "orientation"
 
@@ -164,9 +148,9 @@ class RecordingService : Service(), SensorEventListener {
         private const val NOTIFICATION_ID = 1001
 
         /**
-         * Easy Analysis CSV Header matching Phase 8.3.1 Specification
+         * Easy Analysis CSV Header matching Phase 8.3.2 Specification (using Age_Group)
          */
-        const val EASY_ANALYSIS_HEADER = "Age_Years,Gender,Session_Name,Participant_ID,Session_ID,Activity_Name,Game_Mode,Trial_ID,Event_ID,Timestamp_UTC,Elapsed_Time_ms,Expected_Action,Detected_Action,Outcome,Response_Latency_ms,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z,proximity,acc_magnitude,gyro_magnitude"
+        const val EASY_ANALYSIS_HEADER = "Age_Group,Gender,Session_Name,Participant_ID,Session_ID,Activity_Name,Game_Mode,Trial_ID,Event_ID,Timestamp_UTC,Elapsed_Time_ms,Expected_Action,Detected_Action,Outcome,Response_Latency_ms,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z,proximity,acc_magnitude,gyro_magnitude"
     }
 
     override fun onCreate() {
@@ -194,25 +178,17 @@ class RecordingService : Service(), SensorEventListener {
 
                 testId = intent.getStringExtra(EXTRA_TEST_ID) ?: "TEST_001"
 
-                age = intent.getIntExtra(EXTRA_AGE, 0)
-
                 ageGroup = intent.getStringExtra(EXTRA_AGE_GROUP) ?: "Adult"
 
                 gender = intent.getStringExtra(EXTRA_GENDER) ?: "Prefer not to say"
 
                 sessionName = intent.getStringExtra(EXTRA_SESSION_NAME) ?: "Adapt-IQ Research Session"
 
-                participantType = intent.getStringExtra(EXTRA_USER_TYPE) ?: "UNKNOWN"
-
-                condition = intent.getStringExtra(EXTRA_CONDITION) ?: "SITTING"
-
                 activity = intent.getStringExtra(EXTRA_ACTIVITY) ?: "typing"
 
                 gameMode = intent.getStringExtra(EXTRA_GAME_MODE) ?: "standard"
 
                 eventLabel = intent.getStringExtra(EXTRA_EVENT_LABEL) ?: "SESSION_STARTED"
-
-                deviceModel = intent.getStringExtra(EXTRA_DEVICE_MODEL) ?: ""
 
                 orientation = intent.getStringExtra(EXTRA_ORIENTATION) ?: "portrait"
 
@@ -418,10 +394,10 @@ class RecordingService : Service(), SensorEventListener {
         val gyroMag = sqrt((gyroX * gyroX) + (gyroY * gyroY) + (gyroZ * gyroZ))
         val eventId = eventSequence.incrementAndGet()
 
-        // Easy Analysis row format: Age_Years,Gender,Session_Name,Participant_ID,Session_ID,Activity_Name,Game_Mode,Trial_ID,Event_ID,Timestamp_UTC,Elapsed_Time_ms,Expected_Action,Detected_Action,Outcome,Response_Latency_ms,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z,proximity,acc_magnitude,gyro_magnitude
+        // Easy Analysis row format: Age_Group,Gender,Session_Name,Participant_ID,Session_ID,Activity_Name,Game_Mode,Trial_ID,Event_ID,Timestamp_UTC,Elapsed_Time_ms,Expected_Action,Detected_Action,Outcome,Response_Latency_ms,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z,proximity,acc_magnitude,gyro_magnitude
         val row = String.format(
             Locale.US,
-            "%s,%s,%s,%s,%s,%s,%s,0,%d,%d,%d,none,sensor_sample,none,0,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f",
+            "%s,%s,%s,%s,%s,%s,%s,0,%d,%d,%d,none,sensor_sample,none,NA,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f",
             csv(ageGroup),
             csv(gender),
             csv(sessionName),
@@ -462,10 +438,10 @@ class RecordingService : Service(), SensorEventListener {
 
         val timestamp = System.currentTimeMillis()
 
-        // Easy Analysis row format
+        // Easy Analysis row format with proper missing-value handling (NA for inapplicable sensor fields)
         val row = String.format(
             Locale.US,
-            "%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%d,%s,%s,%s,%d,0,0,0,0,0,0,0,0,0",
+            "%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%d,%s,%s,%s,%d,NA,NA,NA,NA,NA,NA,NA,NA,NA",
             csv(ageGroup),
             csv(gender),
             csv(sessionName),

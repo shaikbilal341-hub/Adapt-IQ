@@ -75,6 +75,8 @@ class MainActivity : ComponentActivity() {
     private var sessionId by mutableStateOf("")
     private var sessionToken by mutableStateOf("")
     private var isSessionActive by mutableStateOf(false)
+    private var currentAgeGroup by mutableStateOf("18–25")
+    private var currentGender by mutableStateOf("Prefer not to say")
 
     // Activity Status tracking (13 Activities)
     private var tapPrecisionStatus by mutableStateOf(ActivityStatus.NOT_STARTED)
@@ -125,6 +127,8 @@ class MainActivity : ComponentActivity() {
             )
             Screen.DEMOGRAPHICS -> DemographicsScreen(
                 onSubmitDemographics = { ageGroup, gender, participantType ->
+                    currentAgeGroup = ageGroup
+                    currentGender = gender
                     coroutineScope.launch {
                         startBackendPseudonymousSession(ageGroup, gender, participantType)
                     }
@@ -495,7 +499,9 @@ class MainActivity : ComponentActivity() {
                     action = RecordingService.ACTION_START
                     putExtra(RecordingService.EXTRA_SESSION_ID, sessionId)
                     putExtra(RecordingService.EXTRA_TEST_ID, testId)
-                    putExtra(RecordingService.EXTRA_DEVICE_MODEL, "Normalized Device")
+                    putExtra(RecordingService.EXTRA_AGE_GROUP, currentAgeGroup)
+                    putExtra(RecordingService.EXTRA_GENDER, currentGender)
+                    putExtra(RecordingService.EXTRA_SESSION_NAME, "Adapt-IQ Research Session")
                 }
                 ContextCompat.startForegroundService(this@MainActivity, intent)
 
@@ -542,7 +548,9 @@ class MainActivity : ComponentActivity() {
             action = RecordingService.ACTION_START
             putExtra(RecordingService.EXTRA_SESSION_ID, sessionId)
             putExtra(RecordingService.EXTRA_TEST_ID, testId)
-            putExtra(RecordingService.EXTRA_DEVICE_MODEL, "Normalized Device")
+            putExtra(RecordingService.EXTRA_AGE_GROUP, currentAgeGroup)
+            putExtra(RecordingService.EXTRA_GENDER, currentGender)
+            putExtra(RecordingService.EXTRA_SESSION_NAME, "Adapt-IQ Research Session")
         }
 
         ContextCompat.startForegroundService(this, intent)

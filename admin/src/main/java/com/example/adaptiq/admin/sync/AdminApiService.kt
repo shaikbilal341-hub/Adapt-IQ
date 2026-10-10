@@ -97,9 +97,9 @@ interface AdminApi {
 }
 
 object AdminApiClient {
-    // 10.0.2.2 points to host machine localhost from Android Emulator.
-    // For physical mobile phone testing over USB, run: adb reverse tcp:4000 tcp:4000
-    private const val BASE_URL = "http://10.0.2.2:4000/"
+    // Configured to Windows PC Wi-Fi LAN address for physical mobile testing.
+    // (Ensure your phone and PC are on the same Wi-Fi network).
+    private const val BASE_URL = "http://192.168.0.102:4000/"
 
     val api: AdminApi by lazy {
         Retrofit.Builder()

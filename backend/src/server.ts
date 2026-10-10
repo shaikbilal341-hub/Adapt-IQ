@@ -58,8 +58,8 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 });
 
 if (process.env.NODE_ENV !== 'test') {
-    app.listen(PORT, async () => {
-        console.log(`Adapt-IQ Backend API running on port ${PORT}`);
+    app.listen(Number(PORT), '0.0.0.0', async () => {
+        console.log(`Adapt-IQ Backend API running on port ${PORT} (bound to 0.0.0.0)`);
         await seedResearchers();
     });
 }

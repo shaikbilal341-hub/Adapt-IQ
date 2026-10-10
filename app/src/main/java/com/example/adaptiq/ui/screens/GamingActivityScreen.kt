@@ -49,18 +49,21 @@ fun GamingActivityScreen(
 ) {
     var gameMode by remember { mutableStateOf(GameMode.SELECTION) }
     var isPractice by remember { mutableStateOf(true) }
-    var timeRemainingSeconds by remember { mutableIntStateOf(45) }
+    var timeRemainingSeconds by remember { mutableIntStateOf(30) } // Exact 30-second active trial
     var isGameRunning by remember { mutableStateOf(false) }
+    var isGamePaused by remember { mutableStateOf(false) }
     var isGameFinished by remember { mutableStateOf(false) }
 
-    // Countdown Timer (45s research trial)
-    LaunchedEffect(isGameRunning) {
-        if (isGameRunning) {
-            while (timeRemainingSeconds > 0 && isGameRunning) {
+    // 30-Second Active Trial Countdown Timer (Pauses when isGamePaused is true)
+    LaunchedEffect(isGameRunning, isGamePaused) {
+        if (isGameRunning && !isGamePaused) {
+            while (timeRemainingSeconds > 0 && isGameRunning && !isGamePaused) {
                 delay(1000)
-                timeRemainingSeconds--
+                if (isGameRunning && !isGamePaused) {
+                    timeRemainingSeconds--
+                }
             }
-            if (timeRemainingSeconds <= 0) {
+            if (timeRemainingSeconds <= 0 && isGameRunning) {
                 isGameRunning = false
                 isGameFinished = true
             }
@@ -81,14 +84,14 @@ fun GamingActivityScreen(
         )
 
         Text(
-            text = "Engage in controlled 3D research mini-games with rigorous timing and obstacle avoidance.",
+            text = "Playable 30-second 3D research mini-games measuring reaction, navigation, and steering stability.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         if (gameMode == GameMode.SELECTION) {
             Text(
-                text = "Choose 3D Research Game",
+                text = "Choose 30-Second Research Game",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -96,34 +99,36 @@ fun GamingActivityScreen(
             Card(
                 onClick = {
                     gameMode = GameMode.ADAPT_IQ_RUNNER
-                    timeRemainingSeconds = 45
+                    timeRemainingSeconds = 30
                     isGameRunning = false
+                    isGamePaused = false
                     isGameFinished = false
                     isPractice = true
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("🏃 Adapt-IQ Runner (3D Perspective)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("🏃 Adapt-IQ Runner (30s Trial)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("3-lane 3D perspective track with typed obstacles (Jump, Slide, Lane Dodge) and monotonic response latency measurement.")
+                    Text("3-lane perspective endless runner. Swipe left/right to dodge, swipe up to jump, swipe down to slide.")
                 }
             }
 
             Card(
                 onClick = {
                     gameMode = GameMode.ADAPT_IQ_DRIVING_LAB
-                    timeRemainingSeconds = 45
+                    timeRemainingSeconds = 30
                     isGameRunning = false
+                    isGamePaused = false
                     isGameFinished = false
                     isPractice = true
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("🏎️ Adapt-IQ Driving Lab (3D Simulation)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("🏎️ Adapt-IQ Driving Lab (30s Trial)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("3D perspective road simulation with approaching vehicles, normalized lane deviation, and precise steering response latency.")
+                    Text("3D perspective road simulation with steering controls, obstacle avoidance, and lane deviation tracking.")
                 }
             }
 
@@ -131,13 +136,14 @@ fun GamingActivityScreen(
                 Text("Back to Dashboard")
             }
         } else {
-            // Active Game Header
+            // Active Game Header & Practice Mode Controls
             PracticeHeader(
                 isPractice = isPractice,
                 onStartOfficialCollection = {
                     isPractice = false
-                    timeRemainingSeconds = 45
+                    timeRemainingSeconds = 30
                     isGameRunning = true
+                    isGamePaused = false
                     isGameFinished = false
                 }
             )
@@ -149,47 +155,73 @@ fun GamingActivityScreen(
             ) {
                 Text(
                     text = when (gameMode) {
-                        GameMode.ADAPT_IQ_RUNNER -> "Adapt-IQ Runner (3D)"
-                        GameMode.ADAPT_IQ_DRIVING_LAB -> "Adapt-IQ Driving Lab (3D)"
+                        GameMode.ADAPT_IQ_RUNNER -> "Adapt-IQ Runner (30s Trial)"
+                        GameMode.ADAPT_IQ_DRIVING_LAB -> "Adapt-IQ Driving Lab (30s Trial)"
                         else -> ""
                     },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
 
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
-                ) {
-                    Text(
-                        text = "⏱️ 00:%02d".format(timeRemainingSeconds),
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (isGameRunning) {
+                        OutlinedButton(onClick = { isGamePaused = !isGamePaused }) {
+                            Text(if (isGamePaused) "Resume" else "Pause")
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Text(
+                            text = "⏱️ 00:%02d".format(timeRemainingSeconds),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
                 }
             }
 
             if (!isGameFinished) {
-                when (gameMode) {
-                    GameMode.ADAPT_IQ_RUNNER -> {
-                        AdaptIqRunner3DView(
-                            isGameRunning = isGameRunning,
-                            isPractice = isPractice,
-                            onLogEvent = onLogEvent
-                        )
+                if (isGamePaused) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(280.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "⏸️ GAME PAUSED\nTrial timer is frozen.",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
+                } else {
+                    when (gameMode) {
+                        GameMode.ADAPT_IQ_RUNNER -> {
+                            AdaptIqRunner3DView(
+                                isGameRunning = isGameRunning,
+                                isPractice = isPractice,
+                                onLogEvent = onLogEvent
+                            )
+                        }
 
-                    GameMode.ADAPT_IQ_DRIVING_LAB -> {
-                        AdaptIqDriving3DView(
-                            isGameRunning = isGameRunning,
-                            isPractice = isPractice,
-                            onLogEvent = onLogEvent
-                        )
+                        GameMode.ADAPT_IQ_DRIVING_LAB -> {
+                            AdaptIqDriving3DView(
+                                isGameRunning = isGameRunning,
+                                isPractice = isPractice,
+                                onLogEvent = onLogEvent
+                            )
+                        }
+
+                        else -> {}
                     }
-
-                    else -> {}
                 }
             }
 
@@ -201,14 +233,14 @@ fun GamingActivityScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "✓ 3D Gaming Session Completed!",
+                            text = "✓ 30-Second Trial Completed Successfully!",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "45-second research gaming session recorded successfully with verified response metrics.",
+                            text = "Active gameplay session recorded with monotonic latency and trial metrics.",
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -233,7 +265,7 @@ fun GamingActivityScreen(
 }
 
 /**
- * Validated Obstacle model for 3D Runner with explicit type and trial onset
+ * Validated Obstacle model for 3D Runner
  */
 private enum class ObstacleType { JUMP, SLIDE, DODGE }
 
@@ -247,7 +279,7 @@ private data class ValidatedRunnerObstacle(
 )
 
 /**
- * Adapt-IQ Runner — Phase 8.2 Validated 3D Runner
+ * Adapt-IQ Runner — Real Playable 30-Second 3D Perspective Endless Runner
  */
 @Composable
 private fun AdaptIqRunner3DView(
@@ -259,22 +291,21 @@ private fun AdaptIqRunner3DView(
     var isJumping by remember { mutableStateOf(false) }
     var isSliding by remember { mutableStateOf(false) }
     var score by remember { mutableIntStateOf(0) }
-    var statusText by remember { mutableStateOf("Swipe to Dodge, Up to Jump, Down to Slide") }
+    var statusText by remember { mutableStateOf("Swipe Left/Right to Dodge, Up to Jump, Down to Slide") }
 
     val obstacles = remember { mutableStateListOf<ValidatedRunnerObstacle>() }
     var trialIdCounter by remember { mutableIntStateOf(1) }
 
-    // State buffer for single valid response per obstacle trial
     var pendingAction by remember { mutableStateOf<String?>(null) }
     var actionTimestamp by remember { mutableLongStateOf(0L) }
 
-    // Game Loop
+    // Game Loop (Active obstacle generation & collision evaluation)
     LaunchedEffect(isGameRunning) {
         var lastSpawnTime = SystemClock.elapsedRealtime()
         while (true) {
             if (isGameRunning) {
                 val now = SystemClock.elapsedRealtime()
-                if (now - lastSpawnTime > 3000L) {
+                if (now - lastSpawnTime > 2200L) {
                     lastSpawnTime = now
                     val randomLane = Random.nextInt(0, 3)
                     val obsType = when (Random.nextInt(0, 3)) {
@@ -282,9 +313,11 @@ private fun AdaptIqRunner3DView(
                         1 -> ObstacleType.SLIDE
                         else -> ObstacleType.DODGE
                     }
+                    val currentId = trialIdCounter
+                    trialIdCounter++
                     obstacles.add(
                         ValidatedRunnerObstacle(
-                            trialId = trialIdCounter++,
+                            trialId = currentId,
                             lane = randomLane,
                             type = obsType,
                             depth = 0.0f,
@@ -293,13 +326,11 @@ private fun AdaptIqRunner3DView(
                     )
                 }
 
-                // Advance obstacles & evaluate once per trial
                 val iterator = obstacles.listIterator()
                 while (iterator.hasNext()) {
                     val obs = iterator.next()
-                    obs.depth += 0.015f
+                    obs.depth += 0.02f
 
-                    // Actionable window around depth 0.80
                     if (obs.depth >= 0.80f && !obs.evaluated) {
                         if (obs.lane == playerLane) {
                             obs.evaluated = true
@@ -317,7 +348,7 @@ private fun AdaptIqRunner3DView(
 
                             val latency = if (actionTimestamp > 0) actionTimestamp - obs.onsetElapsedRealtime else (SystemClock.elapsedRealtime() - obs.onsetElapsedRealtime)
                             val resultStr = if (matched) "successful" else "collision"
-                            statusText = if (matched) "✓ Valid Response! Latency: ${latency}ms" else "💥 Collision Recorded!"
+                            statusText = if (matched) "✓ Avoided! Latency: ${latency}ms" else "💥 Collision!"
                             if (matched) score += 15
 
                             if (!isPractice) {
@@ -345,7 +376,7 @@ private fun AdaptIqRunner3DView(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(320.dp)
+            .height(280.dp)
             .background(Color(0xFF102027), shape = RoundedCornerShape(16.dp))
             .pointerInput(Unit) {
                 detectDragGestures(
@@ -354,7 +385,7 @@ private fun AdaptIqRunner3DView(
                     onDrag = { _, dragAmount ->
                         val dx = dragAmount.x
                         val dy = dragAmount.y
-                        val threshold = 35f
+                        val threshold = 30f
                         val responseTime = SystemClock.elapsedRealtime()
 
                         var action = ""
@@ -369,11 +400,11 @@ private fun AdaptIqRunner3DView(
                         } else if (abs(dy) > abs(dx) && dy < -threshold) {
                             isJumping = true
                             action = "jump"
-                            statusText = "Jump Execution!"
+                            statusText = "Jump over barrier!"
                         } else if (abs(dy) > abs(dx) && dy > threshold) {
                             isSliding = true
                             action = "roll"
-                            statusText = "Slide Execution!"
+                            statusText = "Slide under barrier!"
                         }
 
                         if (action.isNotBlank()) {
@@ -389,6 +420,7 @@ private fun AdaptIqRunner3DView(
             val width = size.width
             val height = size.height
 
+            // Sky & Ground
             drawRect(color = Color(0xFF1A237E), topLeft = Offset(0f, 0f), size = Size(width, height * 0.4f))
             drawRect(color = Color(0xFF263238), topLeft = Offset(0f, height * 0.4f), size = Size(width, height * 0.6f))
 
@@ -400,6 +432,7 @@ private fun AdaptIqRunner3DView(
             val leftLaneBottomX = width / 2f - laneWidthAtBottom * 0.5f
             val rightLaneBottomX = width / 2f + laneWidthAtBottom * 0.5f
 
+            // Draw approaching obstacles
             for (obs in obstacles) {
                 val obsY = horizonY + (bottomY - horizonY) * obs.depth
                 val laneW = (rightLaneBottomX - leftLaneBottomX) / 3f
@@ -422,6 +455,7 @@ private fun AdaptIqRunner3DView(
                 )
             }
 
+            // Player Avatar Position
             val leftLaneCenter = width / 2f - laneWidthAtBottom * 0.3f
             val centerLaneCenter = width / 2f
             val rightLaneCenter = width / 2f + laneWidthAtBottom * 0.3f
@@ -432,8 +466,8 @@ private fun AdaptIqRunner3DView(
                 else -> rightLaneCenter
             }
 
-            val playerY = if (isJumping) height - 140f else height - 90f
-            val playerSize = if (isSliding) 35f else 60f
+            val playerY = if (isJumping) height - 120f else height - 70f
+            val playerSize = if (isSliding) 30f else 50f
 
             drawCircle(
                 color = Color(0xFFFF4081),
@@ -445,11 +479,11 @@ private fun AdaptIqRunner3DView(
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(12.dp),
+                .padding(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(text = statusText, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp, textAlign = TextAlign.Center)
-            Text(text = "Score: $score", color = Color(0xFF81C784), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text(text = statusText, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, textAlign = TextAlign.Center)
+            Text(text = "Score: $score", color = Color(0xFF81C784), fontWeight = FontWeight.Bold, fontSize = 13.sp)
         }
     }
 
@@ -466,7 +500,7 @@ private fun AdaptIqRunner3DView(
 }
 
 /**
- * Adapt-IQ Driving Lab — Validated 3D Driving Simulation with Normalized Lane Deviation
+ * Adapt-IQ Driving Lab — Real Playable 30-Second 3D Perspective Road Simulation
  */
 @Composable
 private fun AdaptIqDriving3DView(
@@ -482,12 +516,11 @@ private fun AdaptIqDriving3DView(
     var wasDeviated by remember { mutableStateOf(false) }
     var trialAttempt = remember { mutableIntStateOf(1) }
 
-    // Driving simulation loop with state transition check for deviation episodes
+    // Driving simulation loop
     LaunchedEffect(isGameRunning) {
         while (true) {
             if (isGameRunning) {
-                // Road half width is ~120px at bottom
-                val roadHalfWidth = 120f
+                val roadHalfWidth = 110f
                 normalizedDeviation = (abs(carXOffset) / roadHalfWidth).coerceIn(0f, 2f)
 
                 val isCurrentlyDeviated = normalizedDeviation > 1.0f
@@ -512,7 +545,7 @@ private fun AdaptIqDriving3DView(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "🏎️ Adapt-IQ Driving Lab (3D Simulation)",
+            text = "🏎️ Adapt-IQ Driving Lab (30s Trial)",
             color = Color.White,
             fontWeight = FontWeight.Bold,
             fontSize = 14.sp
@@ -569,7 +602,7 @@ private fun AdaptIqDriving3DView(
                 Button(
                     onClick = {
                         val onsetTime = SystemClock.elapsedRealtime()
-                        carXOffset -= 25f
+                        carXOffset = (carXOffset - 25f).coerceIn(-120f, 120f)
                         steeringStatus = "Steering Left"
                         val latency = SystemClock.elapsedRealtime() - onsetTime
                         if (!isPractice) {
@@ -583,7 +616,7 @@ private fun AdaptIqDriving3DView(
                 Button(
                     onClick = {
                         val onsetTime = SystemClock.elapsedRealtime()
-                        carXOffset += 25f
+                        carXOffset = (carXOffset + 25f).coerceIn(-120f, 120f)
                         steeringStatus = "Steering Right"
                         val latency = SystemClock.elapsedRealtime() - onsetTime
                         if (!isPractice) {

@@ -65,9 +65,9 @@ class RecordingService : Service(), SensorEventListener {
 
     private var testId = "TEST_001"
 
-    private var ageGroup = "Adult"
+    private var ageGroup = "" // Explicitly uncollected/missing unless provided
 
-    private var gender = "Prefer not to say"
+    private var gender = "" // Explicitly uncollected/missing unless provided
 
     private var sessionName = "Adapt-IQ Research Session"
 
@@ -148,9 +148,14 @@ class RecordingService : Service(), SensorEventListener {
         private const val NOTIFICATION_ID = 1001
 
         /**
-         * Easy Analysis CSV Header matching Phase 8.3.3 Specification (including Touch_Info)
+         * Easy Analysis CSV Header matching Phase 8.3.4 Specification (Exactly 25 columns)
          */
         const val EASY_ANALYSIS_HEADER = "Age_Group,Gender,Session_Name,Participant_ID,Session_ID,Activity_Name,Game_Mode,Trial_ID,Event_ID,Timestamp_UTC,Elapsed_Time_ms,Expected_Action,Detected_Action,Outcome,Response_Latency_ms,Touch_Info,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z,proximity,acc_magnitude,gyro_magnitude"
+
+        /**
+         * Legacy 22-column CSV Header for backward compatibility
+         */
+        const val LEGACY_CSV_HEADER = "timestamp,elapsed_ms,session_id,test_id,event_id,activity,orientation,expected_action,detected_action,result,attempt_id,duration_ms,touch_info,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z,proximity,acc_magnitude,gyro_magnitude"
     }
 
     override fun onCreate() {
@@ -178,9 +183,9 @@ class RecordingService : Service(), SensorEventListener {
 
                 testId = intent.getStringExtra(EXTRA_TEST_ID) ?: "TEST_001"
 
-                ageGroup = intent.getStringExtra(EXTRA_AGE_GROUP) ?: "Adult"
+                ageGroup = intent.getStringExtra(EXTRA_AGE_GROUP) ?: "NA"
 
-                gender = intent.getStringExtra(EXTRA_GENDER) ?: "Prefer not to say"
+                gender = intent.getStringExtra(EXTRA_GENDER) ?: "NA"
 
                 sessionName = intent.getStringExtra(EXTRA_SESSION_NAME) ?: "Adapt-IQ Research Session"
 
@@ -224,7 +229,7 @@ class RecordingService : Service(), SensorEventListener {
 
                     val attempt = intent.getIntExtra(EXTRA_ATTEMPT_ID, 1)
 
-                    val dur = intent.getLongExtra(EXTRA_DURATION, 0L)
+                    val dur = intent.getLongExtra(EXTRA_DURATION, -1L) // -1L indicates unmeasured / missing response latency
 
                     val touch = intent.getStringExtra(EXTRA_TOUCH_INFO) ?: ""
 
@@ -286,7 +291,7 @@ class RecordingService : Service(), SensorEventListener {
 
         csvWriter = BufferedWriter(FileWriter(csvFile, false))
 
-        // Write Easy Analysis Header with metadata columns
+        // Write Easy Analysis Header (25 columns)
         csvWriter?.write(EASY_ANALYSIS_HEADER)
 
         csvWriter?.newLine()
@@ -397,10 +402,10 @@ class RecordingService : Service(), SensorEventListener {
         val gyroMag = sqrt((gyroX * gyroX) + (gyroY * gyroY) + (gyroZ * gyroZ))
         val eventId = eventSequence.incrementAndGet()
 
-        // 24 columns total matching EASY_ANALYSIS_HEADER
+        // Exactly 25 columns matching EASY_ANALYSIS_HEADER
         val row = String.format(
             Locale.US,
-            "%s,%s,%s,%s,%s,%s,%s,0,%d,%d,%d,none,sensor_sample,none,0,\"\",%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f",
+            "%s,%s,%s,%s,%s,%s,%s,0,%d,%d,%d,none,sensor_sample,none,NA,\"\",%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f",
             csv(ageGroup),
             csv(gender),
             csv(sessionName),
@@ -441,11 +446,12 @@ class RecordingService : Service(), SensorEventListener {
         val writer = csvWriter ?: return
 
         val timestamp = System.currentTimeMillis()
+        val latencyStr = if (durationMs < 0L) "NA" else durationMs.toString()
 
-        // 24 columns total matching EASY_ANALYSIS_HEADER
+        // Exactly 25 columns matching EASY_ANALYSIS_HEADER
         val row = String.format(
             Locale.US,
-            "%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%d,%s,%s,%s,%d,%s,NA,NA,NA,NA,NA,NA,NA,NA,NA",
+            "%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%d,%s,%s,%s,%s,%s,NA,NA,NA,NA,NA,NA,NA,NA,NA",
             csv(ageGroup),
             csv(gender),
             csv(sessionName),
@@ -460,7 +466,7 @@ class RecordingService : Service(), SensorEventListener {
             csv(expectedAction),
             csv(detectedAction),
             csv(result),
-            durationMs,
+            latencyStr,
             csv(touchInfo)
         )
 

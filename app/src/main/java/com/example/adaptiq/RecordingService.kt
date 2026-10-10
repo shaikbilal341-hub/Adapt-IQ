@@ -1,7 +1,6 @@
 package com.example.adaptiq
 
 import android.R
-import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -70,11 +69,17 @@ class RecordingService : Service(), SensorEventListener {
 
     private var ageGroup = ""
 
+    private var gender = "Prefer not to say"
+
+    private var sessionName = "Adapt-IQ Research Session"
+
     private var participantType = "UNKNOWN"
 
     private var condition = "SITTING"
 
     private var activity = "typing"
+
+    private var gameMode = "standard"
 
     @Volatile
     private var eventLabel = "SESSION_STARTED"
@@ -109,11 +114,17 @@ class RecordingService : Service(), SensorEventListener {
 
         const val EXTRA_AGE_GROUP = "age_group"
 
+        const val EXTRA_GENDER = "gender"
+
+        const val EXTRA_SESSION_NAME = "session_name"
+
         const val EXTRA_USER_TYPE = "user_type"
 
         const val EXTRA_CONDITION = "condition"
 
         const val EXTRA_ACTIVITY = "activity"
+
+        const val EXTRA_GAME_MODE = "game_mode"
 
         const val EXTRA_EVENT_LABEL = "event_label"
 
@@ -151,6 +162,11 @@ class RecordingService : Service(), SensorEventListener {
         private const val CHANNEL_ID = "AdaptIQRecording"
 
         private const val NOTIFICATION_ID = 1001
+
+        /**
+         * Easy Analysis CSV Header matching Phase 8.3.1 Specification
+         */
+        const val EASY_ANALYSIS_HEADER = "Age_Years,Gender,Session_Name,Participant_ID,Session_ID,Activity_Name,Game_Mode,Trial_ID,Event_ID,Timestamp_UTC,Elapsed_Time_ms,Expected_Action,Detected_Action,Outcome,Response_Latency_ms,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z,proximity,acc_magnitude,gyro_magnitude"
     }
 
     override fun onCreate() {
@@ -159,6 +175,13 @@ class RecordingService : Service(), SensorEventListener {
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
 
         createNotificationChannel()
+    }
+
+    private fun createNotificationChannel() {
+        val channelName = "Adapt-IQ Research Recording"
+        val channel = NotificationChannel(CHANNEL_ID, channelName, NotificationManager.IMPORTANCE_LOW)
+        val manager = getSystemService(NotificationManager::class.java)
+        manager?.createNotificationChannel(channel)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -173,13 +196,19 @@ class RecordingService : Service(), SensorEventListener {
 
                 age = intent.getIntExtra(EXTRA_AGE, 0)
 
-                ageGroup = intent.getStringExtra(EXTRA_AGE_GROUP) ?: ""
+                ageGroup = intent.getStringExtra(EXTRA_AGE_GROUP) ?: "Adult"
+
+                gender = intent.getStringExtra(EXTRA_GENDER) ?: "Prefer not to say"
+
+                sessionName = intent.getStringExtra(EXTRA_SESSION_NAME) ?: "Adapt-IQ Research Session"
 
                 participantType = intent.getStringExtra(EXTRA_USER_TYPE) ?: "UNKNOWN"
 
                 condition = intent.getStringExtra(EXTRA_CONDITION) ?: "SITTING"
 
                 activity = intent.getStringExtra(EXTRA_ACTIVITY) ?: "typing"
+
+                gameMode = intent.getStringExtra(EXTRA_GAME_MODE) ?: "standard"
 
                 eventLabel = intent.getStringExtra(EXTRA_EVENT_LABEL) ?: "SESSION_STARTED"
 
@@ -195,6 +224,8 @@ class RecordingService : Service(), SensorEventListener {
             ACTION_UPDATE_EVENT -> {
 
                 activity = intent.getStringExtra(EXTRA_ACTIVITY) ?: activity
+
+                gameMode = intent.getStringExtra(EXTRA_GAME_MODE) ?: gameMode
 
                 eventLabel = intent.getStringExtra(EXTRA_EVENT_LABEL) ?: eventLabel
 
@@ -219,11 +250,7 @@ class RecordingService : Service(), SensorEventListener {
 
                     val dur = intent.getLongExtra(EXTRA_DURATION, 0L)
 
-                    val touch = intent.getStringExtra(EXTRA_TOUCH_INFO) ?: ""
-
                     val act = intent.getStringExtra(EXTRA_ACTIVITY) ?: activity
-
-                    val orient = intent.getStringExtra(EXTRA_ORIENTATION) ?: orientation
 
                     val elapsed = SystemClock.elapsedRealtime() - recordingStartTime
 
@@ -231,13 +258,11 @@ class RecordingService : Service(), SensorEventListener {
                         eventId = eventId,
                         elapsedMs = elapsed,
                         activity = act,
-                        orientation = orient,
                         expectedAction = expAction,
                         detectedAction = detAction,
                         result = res,
                         attemptId = attempt,
-                        durationMs = dur,
-                        touchInfo = touch
+                        durationMs = dur
                     )
                 }
             }
@@ -282,31 +307,8 @@ class RecordingService : Service(), SensorEventListener {
 
         csvWriter = BufferedWriter(FileWriter(csvFile, false))
 
-        // Updated CSV Header matching research specification
-        csvWriter?.write(
-            "timestamp," +
-                    "elapsed_ms," +
-                    "session_id," +
-                    "test_id," +
-                    "event_id," +
-                    "activity," +
-                    "orientation," +
-                    "expected_action," +
-                    "detected_action," +
-                    "result," +
-                    "attempt_id," +
-                    "duration_ms," +
-                    "touch_info," +
-                    "acc_x," +
-                    "acc_y," +
-                    "acc_z," +
-                    "gyro_x," +
-                    "gyro_y," +
-                    "gyro_z," +
-                    "proximity," +
-                    "acc_magnitude," +
-                    "gyro_magnitude"
-        )
+        // Write Easy Analysis Header with metadata columns
+        csvWriter?.write(EASY_ANALYSIS_HEADER)
 
         csvWriter?.newLine()
 
@@ -416,16 +418,20 @@ class RecordingService : Service(), SensorEventListener {
         val gyroMag = sqrt((gyroX * gyroX) + (gyroY * gyroY) + (gyroZ * gyroZ))
         val eventId = eventSequence.incrementAndGet()
 
+        // Easy Analysis row format: Age_Years,Gender,Session_Name,Participant_ID,Session_ID,Activity_Name,Game_Mode,Trial_ID,Event_ID,Timestamp_UTC,Elapsed_Time_ms,Expected_Action,Detected_Action,Outcome,Response_Latency_ms,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z,proximity,acc_magnitude,gyro_magnitude
         val row = String.format(
             Locale.US,
-            "%d,%d,%s,%s,%d,%s,%s,none,sensor_sample,none,0,0,\"\",%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f",
+            "%s,%s,%s,%s,%s,%s,%s,0,%d,%d,%d,none,sensor_sample,none,0,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f",
+            csv(ageGroup),
+            csv(gender),
+            csv(sessionName),
+            csv(testId),
+            csv(sessionId),
+            csv(activity),
+            csv(gameMode),
+            eventId,
             timestamp,
             elapsedMs,
-            csv(sessionId),
-            csv(testId),
-            eventId,
-            csv(activity),
-            csv(orientation),
             accX, accY, accZ,
             gyroX, gyroY, gyroZ,
             proximity,
@@ -446,40 +452,35 @@ class RecordingService : Service(), SensorEventListener {
         eventId: Long,
         elapsedMs: Long,
         activity: String,
-        orientation: String,
         expectedAction: String,
         detectedAction: String,
         result: String,
         attemptId: Int,
-        durationMs: Long,
-        touchInfo: String
+        durationMs: Long
     ) {
         val writer = csvWriter ?: return
 
         val timestamp = System.currentTimeMillis()
-        val accMag = sqrt((accX * accX) + (accY * accY) + (accZ * accZ))
-        val gyroMag = sqrt((gyroX * gyroX) + (gyroY * gyroY) + (gyroZ * gyroZ))
 
+        // Easy Analysis row format
         val row = String.format(
             Locale.US,
-            "%d,%d,%s,%s,%d,%s,%s,%s,%s,%s,%d,%d,%s,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f",
+            "%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%d,%s,%s,%s,%d,0,0,0,0,0,0,0,0,0",
+            csv(ageGroup),
+            csv(gender),
+            csv(sessionName),
+            csv(testId),
+            csv(sessionId),
+            csv(activity),
+            csv(gameMode),
+            attemptId,
+            eventId,
             timestamp,
             elapsedMs,
-            csv(sessionId),
-            csv(testId),
-            eventId,
-            csv(activity),
-            csv(orientation),
             csv(expectedAction),
             csv(detectedAction),
             csv(result),
-            attemptId,
-            durationMs,
-            csv(touchInfo),
-            accX, accY, accZ,
-            gyroX, gyroY, gyroZ,
-            proximity,
-            accMag, gyroMag
+            durationMs
         )
 
         synchronized(writer) {
@@ -494,7 +495,7 @@ class RecordingService : Service(), SensorEventListener {
 
     private fun csv(value: String): String {
         val escaped = value.replace("\"", "\"\"")
-        return if (escaped.contains(",") || escaped.contains("\"")) {
+        return if (escaped.contains(",") || escaped.contains("\"") || escaped.contains("\n")) {
             "\"$escaped\""
         } else {
             escaped
@@ -503,36 +504,20 @@ class RecordingService : Service(), SensorEventListener {
 
     private fun createNotification(): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("AdaptIQ recording active")
-            .setContentText("$testId • $activity • $orientation")
-            .setSmallIcon(R.drawable.ic_menu_info_details)
-            .setOngoing(true)
+            .setContentTitle("Adapt-IQ Research Session Active")
+            .setContentText("Collecting anonymous interaction data for $activity")
+            .setSmallIcon(R.drawable.ic_menu_compass)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
 
-    @SuppressLint("MissingPermission")
     private fun updateNotification() {
-        if (!isRecording) return
         val manager = getSystemService(NotificationManager::class.java)
-        manager.notify(NOTIFICATION_ID, createNotification())
+        val notification = createNotification()
+        manager?.notify(NOTIFICATION_ID, notification)
     }
 
-    private fun createNotificationChannel() {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            "AdaptIQ Recording",
-            NotificationManager.IMPORTANCE_LOW
-        )
-        channel.description = "Shows when AdaptIQ is recording sensor data"
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(channel)
-    }
-
-    override fun onBind(intent: Intent?): IBinder? = null
-
-    override fun onDestroy() {
-        stopRecording()
-        super.onDestroy()
+    override fun onBind(intent: Intent?): IBinder? {
+        return null
     }
 }

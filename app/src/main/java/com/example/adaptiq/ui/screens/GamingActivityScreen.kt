@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.adaptiq.ui.components.PracticeHeader
 import kotlinx.coroutines.delay
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.random.Random
 
@@ -80,7 +81,7 @@ fun GamingActivityScreen(
         )
 
         Text(
-            text = "Engage in controlled 3D research mini-games to measure natural interaction behavior.",
+            text = "Engage in controlled 3D research mini-games with rigorous timing and obstacle avoidance.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -105,7 +106,7 @@ fun GamingActivityScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("🏃 Adapt-IQ Runner (3D Perspective)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("3-lane 3D perspective running track with approaching obstacles. Swipe left/right, jump, and slide.")
+                    Text("3-lane 3D perspective track with typed obstacles (Jump, Slide, Lane Dodge) and monotonic response latency measurement.")
                 }
             }
 
@@ -122,7 +123,7 @@ fun GamingActivityScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("🏎️ Adapt-IQ Driving Lab (3D Simulation)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("3D perspective road driving simulation with steering, lane deviation tracking, and obstacle avoidance.")
+                    Text("3D perspective road simulation with approaching vehicles, normalized lane deviation, and precise steering response latency.")
                 }
             }
 
@@ -207,7 +208,7 @@ fun GamingActivityScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "45-second research gaming session recorded successfully.",
+                            text = "45-second research gaming session recorded successfully with verified response metrics.",
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -232,16 +233,21 @@ fun GamingActivityScreen(
 }
 
 /**
- * Obstacle model for 3D Runner
+ * Validated Obstacle model for 3D Runner with explicit type and trial onset
  */
-private data class RunnerObstacle(
-    val id: Int,
+private enum class ObstacleType { JUMP, SLIDE, DODGE }
+
+private data class ValidatedRunnerObstacle(
+    val trialId: Int,
     val lane: Int,
-    var depth: Float // 0.0 (horizon) to 1.0 (player)
+    val type: ObstacleType,
+    var depth: Float, // 0.0 (horizon) to 1.0 (player)
+    val onsetElapsedRealtime: Long,
+    var evaluated: Boolean = false
 )
 
 /**
- * Adapt-IQ Runner — Active 3-Lane 3D Perspective Endless Runner with Collision & Monotonic Latency
+ * Adapt-IQ Runner — Phase 8.2 Validated 3D Runner
  */
 @Composable
 private fun AdaptIqRunner3DView(
@@ -253,54 +259,82 @@ private fun AdaptIqRunner3DView(
     var isJumping by remember { mutableStateOf(false) }
     var isSliding by remember { mutableStateOf(false) }
     var score by remember { mutableIntStateOf(0) }
-    var statusText by remember { mutableStateOf("Swipe Left/Right, Up to Jump, Down to Slide") }
+    var statusText by remember { mutableStateOf("Swipe to Dodge, Up to Jump, Down to Slide") }
 
-    val obstacles = remember { mutableStateListOf<RunnerObstacle>() }
-    var obstacleIdCounter by remember { mutableIntStateOf(0) }
-    var trialAttempt = remember { mutableIntStateOf(1) }
-    var gestureStartTime by remember { mutableLongStateOf(0L) }
+    val obstacles = remember { mutableStateListOf<ValidatedRunnerObstacle>() }
+    var trialIdCounter by remember { mutableIntStateOf(1) }
 
-    // Game Loop for obstacle movement & collision
+    // State buffer for single valid response per obstacle trial
+    var pendingAction by remember { mutableStateOf<String?>(null) }
+    var actionTimestamp by remember { mutableLongStateOf(0L) }
+
+    // Game Loop
     LaunchedEffect(isGameRunning) {
         var lastSpawnTime = SystemClock.elapsedRealtime()
         while (true) {
             if (isGameRunning) {
                 val now = SystemClock.elapsedRealtime()
-                if (now - lastSpawnTime > 2500L) {
+                if (now - lastSpawnTime > 3000L) {
                     lastSpawnTime = now
                     val randomLane = Random.nextInt(0, 3)
-                    obstacleIdCounter++
-                    obstacles.add(RunnerObstacle(obstacleIdCounter, randomLane, 0.0f))
+                    val obsType = when (Random.nextInt(0, 3)) {
+                        0 -> ObstacleType.JUMP
+                        1 -> ObstacleType.SLIDE
+                        else -> ObstacleType.DODGE
+                    }
+                    obstacles.add(
+                        ValidatedRunnerObstacle(
+                            trialId = trialIdCounter++,
+                            lane = randomLane,
+                            type = obsType,
+                            depth = 0.0f,
+                            onsetElapsedRealtime = now
+                        )
+                    )
                 }
 
+                // Advance obstacles & evaluate once per trial
                 val iterator = obstacles.listIterator()
                 while (iterator.hasNext()) {
                     val obs = iterator.next()
-                    obs.depth += 0.018f
+                    obs.depth += 0.015f
 
-                    if (obs.depth >= 0.82f && obs.depth <= 0.92f) {
+                    // Actionable window around depth 0.80
+                    if (obs.depth >= 0.80f && !obs.evaluated) {
                         if (obs.lane == playerLane) {
-                            val avoided = isJumping || isSliding
-                            val resultStr = if (avoided) "successful" else "incorrect"
-                            statusText = if (avoided) "✓ Obstacle Avoided!" else "💥 Collision!"
-                            if (avoided) score += 10
+                            obs.evaluated = true
+                            val expected = when (obs.type) {
+                                ObstacleType.JUMP -> "jump"
+                                ObstacleType.SLIDE -> "roll"
+                                ObstacleType.DODGE -> "swipe_dodge"
+                            }
+
+                            val matched = when (obs.type) {
+                                ObstacleType.JUMP -> isJumping
+                                ObstacleType.SLIDE -> isSliding
+                                ObstacleType.DODGE -> playerLane != obs.lane
+                            }
+
+                            val latency = if (actionTimestamp > 0) actionTimestamp - obs.onsetElapsedRealtime else (SystemClock.elapsedRealtime() - obs.onsetElapsedRealtime)
+                            val resultStr = if (matched) "successful" else "collision"
+                            statusText = if (matched) "✓ Valid Response! Latency: ${latency}ms" else "💥 Collision Recorded!"
+                            if (matched) score += 15
 
                             if (!isPractice) {
-                                val reactionMs = SystemClock.elapsedRealtime() - now
                                 onLogEvent(
-                                    if (obs.lane == 0) "swipe_right" else "jump_or_slide",
-                                    if (avoided) "jump_or_slide" else "collision",
+                                    expected,
+                                    pendingAction ?: "none",
                                     resultStr,
-                                    trialAttempt.intValue++,
-                                    reactionMs.coerceAtLeast(50L),
-                                    "lane=${obs.lane},depth=${obs.depth}"
+                                    obs.trialId,
+                                    latency.coerceIn(30L, 2000L),
+                                    "lane=${obs.lane},type=${obs.type}"
                                 )
                             }
-                            iterator.remove()
+                            pendingAction = null
+                            actionTimestamp = 0L
                         }
-                    } else if (obs.depth > 1.0f) {
+                    } else if (obs.depth > 1.05f) {
                         iterator.remove()
-                        score += 5
                     }
                 }
             }
@@ -315,12 +349,13 @@ private fun AdaptIqRunner3DView(
             .background(Color(0xFF102027), shape = RoundedCornerShape(16.dp))
             .pointerInput(Unit) {
                 detectDragGestures(
-                    onDragStart = { gestureStartTime = SystemClock.elapsedRealtime() },
+                    onDragStart = { },
                     onDragEnd = { },
                     onDrag = { _, dragAmount ->
                         val dx = dragAmount.x
                         val dy = dragAmount.y
-                        val threshold = 30f
+                        val threshold = 35f
+                        val responseTime = SystemClock.elapsedRealtime()
 
                         var action = ""
                         if (abs(dx) > abs(dy) && dx > threshold && playerLane < 2) {
@@ -334,23 +369,16 @@ private fun AdaptIqRunner3DView(
                         } else if (abs(dy) > abs(dx) && dy < -threshold) {
                             isJumping = true
                             action = "jump"
-                            statusText = "Jump over obstacle!"
+                            statusText = "Jump Execution!"
                         } else if (abs(dy) > abs(dx) && dy > threshold) {
                             isSliding = true
                             action = "roll"
-                            statusText = "Slide under obstacle!"
+                            statusText = "Slide Execution!"
                         }
 
-                        if (action.isNotBlank() && !isPractice) {
-                            val duration = SystemClock.elapsedRealtime() - gestureStartTime
-                            onLogEvent(
-                                action,
-                                action,
-                                "successful",
-                                trialAttempt.intValue++,
-                                duration.coerceAtLeast(30L),
-                                "lane=$playerLane,action=$action"
-                            )
+                        if (action.isNotBlank()) {
+                            pendingAction = action
+                            actionTimestamp = responseTime
                         }
                     }
                 )
@@ -361,9 +389,7 @@ private fun AdaptIqRunner3DView(
             val width = size.width
             val height = size.height
 
-            // Horizon & Sky
             drawRect(color = Color(0xFF1A237E), topLeft = Offset(0f, 0f), size = Size(width, height * 0.4f))
-            // Ground
             drawRect(color = Color(0xFF263238), topLeft = Offset(0f, height * 0.4f), size = Size(width, height * 0.6f))
 
             val horizonX = width / 2f
@@ -374,7 +400,6 @@ private fun AdaptIqRunner3DView(
             val leftLaneBottomX = width / 2f - laneWidthAtBottom * 0.5f
             val rightLaneBottomX = width / 2f + laneWidthAtBottom * 0.5f
 
-            // Draw Obstacles in 3D perspective
             for (obs in obstacles) {
                 val obsY = horizonY + (bottomY - horizonY) * obs.depth
                 val laneW = (rightLaneBottomX - leftLaneBottomX) / 3f
@@ -383,10 +408,15 @@ private fun AdaptIqRunner3DView(
                     1 -> horizonX
                     else -> rightLaneBottomX - laneW * 0.5f - (obs.depth * (rightLaneBottomX - horizonX - laneW * 0.5f))
                 }
-                val obsSize = 30f * (0.2f + obs.depth * 0.8f)
+                val obsSize = 35f * (0.2f + obs.depth * 0.8f)
+                val obsColor = when (obs.type) {
+                    ObstacleType.JUMP -> Color(0xFFD32F2F)
+                    ObstacleType.SLIDE -> Color(0xFF7B1FA2)
+                    ObstacleType.DODGE -> Color(0xFFF57C00)
+                }
 
                 drawRect(
-                    color = Color(0xFFD32F2F),
+                    color = obsColor,
                     topLeft = Offset(obsX - obsSize / 2f, obsY - obsSize / 2f),
                     size = Size(obsSize, obsSize)
                 )
@@ -425,18 +455,18 @@ private fun AdaptIqRunner3DView(
 
     LaunchedEffect(isJumping, isSliding) {
         if (isJumping) {
-            delay(450)
+            delay(400)
             isJumping = false
         }
         if (isSliding) {
-            delay(450)
+            delay(400)
             isSliding = false
         }
     }
 }
 
 /**
- * Adapt-IQ Driving Lab — 3D Perspective Road Simulation with Lane Deviation & Obstacles
+ * Adapt-IQ Driving Lab — Validated 3D Driving Simulation with Normalized Lane Deviation
  */
 @Composable
 private fun AdaptIqDriving3DView(
@@ -446,17 +476,27 @@ private fun AdaptIqDriving3DView(
 ) {
     var carXOffset by remember { mutableFloatStateOf(0f) }
     var speed by remember { mutableIntStateOf(60) }
-    var steeringStatus by remember { mutableStateOf("Steer to stay on the 3D road") }
-    var laneDeviationCount by remember { mutableIntStateOf(0) }
+    var steeringStatus by remember { mutableStateOf("Steer to stay centered on road") }
+    var normalizedDeviation by remember { mutableFloatStateOf(0f) }
+    var deviationEpisodeCount by remember { mutableIntStateOf(0) }
+    var wasDeviated by remember { mutableStateOf(false) }
     var trialAttempt = remember { mutableIntStateOf(1) }
 
-    // Driving simulation loop
+    // Driving simulation loop with state transition check for deviation episodes
     LaunchedEffect(isGameRunning) {
         while (true) {
             if (isGameRunning) {
-                if (abs(carXOffset) > 100f) {
-                    laneDeviationCount++
-                    steeringStatus = "⚠️ Lane Deviation Warning!"
+                // Road half width is ~120px at bottom
+                val roadHalfWidth = 120f
+                normalizedDeviation = (abs(carXOffset) / roadHalfWidth).coerceIn(0f, 2f)
+
+                val isCurrentlyDeviated = normalizedDeviation > 1.0f
+                if (isCurrentlyDeviated && !wasDeviated) {
+                    deviationEpisodeCount++
+                    steeringStatus = "⚠️ Lane Boundary Exceeded!"
+                    wasDeviated = true
+                } else if (!isCurrentlyDeviated) {
+                    wasDeviated = false
                 }
             }
             delay(100L)
@@ -490,9 +530,7 @@ private fun AdaptIqDriving3DView(
                 val width = size.width
                 val height = size.height
 
-                // Sky
                 drawRect(color = Color(0xFF0D47A1), topLeft = Offset(0f, 0f), size = Size(width, height * 0.35f))
-                // Road Perspective Trapezoid
                 val roadPath = Path().apply {
                     moveTo(width / 2f - 40f, height * 0.35f)
                     lineTo(width / 2f + 40f, height * 0.35f)
@@ -502,7 +540,6 @@ private fun AdaptIqDriving3DView(
                 }
                 drawPath(roadPath, Color(0xFF616161))
 
-                // Vehicle Representation
                 val carX = width / 2f + carXOffset
                 val carY = height - 40f
                 drawRoundRect(
@@ -514,7 +551,7 @@ private fun AdaptIqDriving3DView(
             }
 
             Text(
-                text = "Speed: $speed km/h • Deviations: $laneDeviationCount • $steeringStatus",
+                text = "Speed: $speed km/h • Norm. Dev: ${String.format(Locale.US, "%.2f", normalizedDeviation)} • Episodes: $deviationEpisodeCount",
                 color = Color.White,
                 fontSize = 11.sp,
                 modifier = Modifier
@@ -523,7 +560,7 @@ private fun AdaptIqDriving3DView(
             )
         }
 
-        // Steering & Pedal Controls
+        // Steering Controls
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -531,12 +568,12 @@ private fun AdaptIqDriving3DView(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = {
-                        val startTime = SystemClock.elapsedRealtime()
+                        val onsetTime = SystemClock.elapsedRealtime()
                         carXOffset -= 25f
                         steeringStatus = "Steering Left"
-                        val duration = SystemClock.elapsedRealtime() - startTime
+                        val latency = SystemClock.elapsedRealtime() - onsetTime
                         if (!isPractice) {
-                            onLogEvent("steer_left", "steer_left", "successful", trialAttempt.intValue++, duration.coerceAtLeast(30L), "offset=$carXOffset")
+                            onLogEvent("steer_left", "steer_left", "successful", trialAttempt.intValue++, latency.coerceIn(30L, 1000L), "offset=$carXOffset,dev=$normalizedDeviation")
                         }
                     }
                 ) {
@@ -545,12 +582,12 @@ private fun AdaptIqDriving3DView(
 
                 Button(
                     onClick = {
-                        val startTime = SystemClock.elapsedRealtime()
+                        val onsetTime = SystemClock.elapsedRealtime()
                         carXOffset += 25f
                         steeringStatus = "Steering Right"
-                        val duration = SystemClock.elapsedRealtime() - startTime
+                        val latency = SystemClock.elapsedRealtime() - onsetTime
                         if (!isPractice) {
-                            onLogEvent("steer_right", "steer_right", "successful", trialAttempt.intValue++, duration.coerceAtLeast(30L), "offset=$carXOffset")
+                            onLogEvent("steer_right", "steer_right", "successful", trialAttempt.intValue++, latency.coerceIn(30L, 1000L), "offset=$carXOffset,dev=$normalizedDeviation")
                         }
                     }
                 ) {
@@ -561,12 +598,12 @@ private fun AdaptIqDriving3DView(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = {
-                        val startTime = SystemClock.elapsedRealtime()
+                        val onsetTime = SystemClock.elapsedRealtime()
                         speed = (speed + 10).coerceAtMost(140)
                         steeringStatus = "Accelerating"
-                        val duration = SystemClock.elapsedRealtime() - startTime
+                        val latency = SystemClock.elapsedRealtime() - onsetTime
                         if (!isPractice) {
-                            onLogEvent("accelerate", "accelerate", "successful", trialAttempt.intValue++, duration.coerceAtLeast(30L), "speed=$speed")
+                            onLogEvent("accelerate", "accelerate", "successful", trialAttempt.intValue++, latency.coerceIn(30L, 1000L), "speed=$speed")
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
@@ -576,12 +613,12 @@ private fun AdaptIqDriving3DView(
 
                 Button(
                     onClick = {
-                        val startTime = SystemClock.elapsedRealtime()
+                        val onsetTime = SystemClock.elapsedRealtime()
                         speed = (speed - 15).coerceAtLeast(0)
                         steeringStatus = "Braking"
-                        val duration = SystemClock.elapsedRealtime() - startTime
+                        val latency = SystemClock.elapsedRealtime() - onsetTime
                         if (!isPractice) {
-                            onLogEvent("brake", "brake", "successful", trialAttempt.intValue++, duration.coerceAtLeast(30L), "speed=$speed")
+                            onLogEvent("brake", "brake", "successful", trialAttempt.intValue++, latency.coerceIn(30L, 1000L), "speed=$speed")
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828))

@@ -58,7 +58,7 @@ fun VisualSearchActivityScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text(
-            text = "Activity 9 of 13: Visual Search",
+            text = "Activity 10 of 13: Visual Search",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )

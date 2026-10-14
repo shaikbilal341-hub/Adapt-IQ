@@ -53,7 +53,7 @@ fun SliderControlActivityScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text(
-            text = "Activity 8 of 13: Slider Control",
+            text = "Activity 9 of 13: Slider Control",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )

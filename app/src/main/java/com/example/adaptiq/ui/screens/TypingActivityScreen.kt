@@ -71,7 +71,7 @@ fun TypingActivityScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Typing Activity",
+            text = "Activity 4 of 13: Typing",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )

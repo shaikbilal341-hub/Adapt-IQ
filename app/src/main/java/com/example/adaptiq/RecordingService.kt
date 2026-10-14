@@ -234,6 +234,10 @@ class RecordingService : Service(), SensorEventListener {
                     val touch = intent.getStringExtra(EXTRA_TOUCH_INFO) ?: ""
 
                     val act = intent.getStringExtra(EXTRA_ACTIVITY) ?: activity
+                    activity = act
+
+                    val gMode = intent.getStringExtra(EXTRA_GAME_MODE) ?: gameMode
+                    gameMode = gMode
 
                     val elapsed = SystemClock.elapsedRealtime() - recordingStartTime
 
@@ -270,12 +274,7 @@ class RecordingService : Service(), SensorEventListener {
             return
         }
 
-        val directory = getExternalFilesDir("datasets")
-
-        if (directory == null) {
-            stopSelf()
-            return
-        }
+        val directory = getExternalFilesDir("datasets") ?: File(filesDir, "datasets")
 
         if (!directory.exists()) {
             directory.mkdirs()
@@ -285,9 +284,7 @@ class RecordingService : Service(), SensorEventListener {
 
         val safeSession = sessionId.replace(Regex("[^A-Za-z0-9_-]"), "_")
 
-        val safeActivity = activity.replace(Regex("[^A-Za-z0-9_-]"), "_")
-
-        csvFile = File(directory, "${safeSession}_${safeActivity}_$time.csv")
+        csvFile = File(directory, "${safeSession}_AdaptIQ_$time.csv")
 
         csvWriter = BufferedWriter(FileWriter(csvFile, false))
 

@@ -5,4 +5,8 @@
         name="adapt_iq_files"
         path="datasets/" />
 
+    <files-path
+        name="adapt_iq_internal_files"
+        path="datasets/" />
+
 </paths>

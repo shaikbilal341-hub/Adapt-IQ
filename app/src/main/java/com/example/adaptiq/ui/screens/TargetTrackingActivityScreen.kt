@@ -59,7 +59,7 @@ fun TargetTrackingActivityScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text(
-            text = "Activity 7 of 13: Target Tracking",
+            text = "Activity 8 of 13: Target Tracking",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )

@@ -85,7 +85,7 @@ fun NavigationTaskActivityScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text(
-            text = "Activity 10 of 13: Navigation Task",
+            text = "Activity 11 of 13: Navigation Task",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )

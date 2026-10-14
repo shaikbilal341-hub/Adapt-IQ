@@ -63,7 +63,7 @@ fun TapPrecisionActivityScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text(
-            text = "Activity 1 of 13: Tap Precision",
+            text = "Activity 2 of 13: Tap Precision",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )

@@ -120,7 +120,7 @@ fun GestureActivityScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Gesture Activity",
+            text = "Activity 5 of 13: Swipe / Gesture",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )

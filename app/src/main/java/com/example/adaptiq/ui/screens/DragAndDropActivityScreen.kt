@@ -60,7 +60,7 @@ fun DragAndDropActivityScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text(
-            text = "Activity 6 of 13: Drag & Drop",
+            text = "Activity 7 of 13: Drag & Drop",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )

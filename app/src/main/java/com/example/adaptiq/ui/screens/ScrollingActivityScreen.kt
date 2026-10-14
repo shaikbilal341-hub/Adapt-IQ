@@ -152,7 +152,7 @@ fun ScrollingActivityScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text(
-            text = "Scrolling Activity",
+            text = "Activity 6 of 13: Scrolling",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )

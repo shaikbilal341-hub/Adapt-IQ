@@ -244,12 +244,23 @@ class MainActivity : ComponentActivity() {
                 color = MaterialTheme.colorScheme.primary
             )
 
-            if (!isSessionActive) {
+            // Two Primary Actions prominently at the top
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 Button(
                     onClick = { currentScreen = Screen.DEMOGRAPHICS },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Text("PROCEED TO TEST", fontWeight = FontWeight.Bold)
+                    Text(if (isSessionActive) "PARTICIPANT INFO" else "PROCEED TO TEST", fontWeight = FontWeight.Bold)
+                }
+
+                OutlinedButton(
+                    onClick = { currentScreen = Screen.PREVIOUS_SESSIONS },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("PREVIOUS DATA", fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -260,14 +271,14 @@ class MainActivity : ComponentActivity() {
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "PARTICIPANT ID: $testId",
+                        text = if (isSessionActive) "PARTICIPANT ID: $testId (Age $currentAgeYears)" else "PARTICIPANT ID: $testId (Not Started)",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Zero PII • Local-First Storage • Secure Synchronization",
+                        text = if (isSessionActive) "Gender: $currentGender • Active Research Session" else "Zero PII • Local-First Storage • Tap 'Proceed to Test' to Begin",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                     )
@@ -310,32 +321,51 @@ class MainActivity : ComponentActivity() {
             )
 
             // 13 Activity Cards
-            ActivityCard("1. Holding the Phone", holdingPhoneStatus) { ensureSessionStarted(); currentScreen = Screen.HOLDING_PHONE }
-            ActivityCard("2. Tap Precision", tapPrecisionStatus) { ensureSessionStarted(); currentScreen = Screen.TAP_PRECISION }
-            ActivityCard("3. Reaction Time", reactionTimeStatus) { ensureSessionStarted(); currentScreen = Screen.REACTION_TIME }
-            ActivityCard("4. Typing", typingStatus) { ensureSessionStarted(); currentScreen = Screen.TYPING }
-            ActivityCard("5. Swipe / Gesture", gestureStatus) { ensureSessionStarted(); currentScreen = Screen.GESTURES }
-            ActivityCard("6. Scrolling", scrollStatus) { ensureSessionStarted(); currentScreen = Screen.SCROLLING }
-            ActivityCard("7. Drag & Drop", dragDropStatus) { ensureSessionStarted(); currentScreen = Screen.DRAG_DROP }
-            ActivityCard("8. Target Tracking", targetTrackingStatus) { ensureSessionStarted(); currentScreen = Screen.TARGET_TRACKING }
-            ActivityCard("9. Slider Control", sliderControlStatus) { ensureSessionStarted(); currentScreen = Screen.SLIDER_CONTROL }
-            ActivityCard("10. Visual Search", visualSearchStatus) { ensureSessionStarted(); currentScreen = Screen.VISUAL_SEARCH }
-            ActivityCard("11. Navigation Task", navigationStatus) { ensureSessionStarted(); currentScreen = Screen.NAVIGATION }
-            ActivityCard("12. Multi-Touch", multiTouchStatus) { ensureSessionStarted(); currentScreen = Screen.MULTI_TOUCH }
-            ActivityCard("13. Gaming-style Interaction", gamingStatus) { ensureSessionStarted(); currentScreen = Screen.GAMING }
+            ActivityCard("1. Holding the Phone", holdingPhoneStatus) {
+                navigateToActivity("holding_phone", Screen.HOLDING_PHONE)
+            }
+            ActivityCard("2. Tap Precision", tapPrecisionStatus) {
+                navigateToActivity("tap_precision", Screen.TAP_PRECISION)
+            }
+            ActivityCard("3. Reaction Time", reactionTimeStatus) {
+                navigateToActivity("reaction_time", Screen.REACTION_TIME)
+            }
+            ActivityCard("4. Typing", typingStatus) {
+                navigateToActivity("typing", Screen.TYPING)
+            }
+            ActivityCard("5. Swipe / Gesture", gestureStatus) {
+                navigateToActivity("gestures", Screen.GESTURES)
+            }
+            ActivityCard("6. Scrolling", scrollStatus) {
+                navigateToActivity("scrolling", Screen.SCROLLING)
+            }
+            ActivityCard("7. Drag & Drop", dragDropStatus) {
+                navigateToActivity("drag_drop", Screen.DRAG_DROP)
+            }
+            ActivityCard("8. Target Tracking", targetTrackingStatus) {
+                navigateToActivity("target_tracking", Screen.TARGET_TRACKING)
+            }
+            ActivityCard("9. Slider Control", sliderControlStatus) {
+                navigateToActivity("slider_control", Screen.SLIDER_CONTROL)
+            }
+            ActivityCard("10. Visual Search", visualSearchStatus) {
+                navigateToActivity("visual_search", Screen.VISUAL_SEARCH)
+            }
+            ActivityCard("11. Navigation Task", navigationStatus) {
+                navigateToActivity("navigation", Screen.NAVIGATION)
+            }
+            ActivityCard("12. Multi-Touch", multiTouchStatus) {
+                navigateToActivity("multi_touch", Screen.MULTI_TOUCH)
+            }
+            ActivityCard("13. Gaming-style Interaction", gamingStatus) {
+                navigateToActivity("gaming", Screen.GAMING)
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 
             OutlinedButton(
-                onClick = { currentScreen = Screen.PREVIOUS_SESSIONS },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Previous Test Data")
-            }
-
-            OutlinedButton(
                 onClick = {
-                    currentScreen = Screen.WELCOME
+                    resetSessionForNextParticipant()
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -574,6 +604,62 @@ class MainActivity : ComponentActivity() {
         currentScreen = Screen.HOME
     }
 
+    private fun navigateToActivity(activityName: String, screen: Screen) {
+        if (!isSessionActive || sessionId.isBlank()) {
+            showToast("Please complete participant details first to start research session")
+            currentScreen = Screen.DEMOGRAPHICS
+        } else {
+            updateCurrentActivity(activityName)
+            currentScreen = screen
+        }
+    }
+
+    private fun updateCurrentActivity(activityName: String, gameMode: String = "standard") {
+        val intent = Intent(this, RecordingService::class.java).apply {
+            action = RecordingService.ACTION_UPDATE_EVENT
+            putExtra(RecordingService.EXTRA_ACTIVITY, activityName)
+            putExtra(RecordingService.EXTRA_GAME_MODE, gameMode)
+        }
+        startService(intent)
+    }
+
+    private fun resetSessionForNextParticipant() {
+        val intent = Intent(this, RecordingService::class.java).apply {
+            action = RecordingService.ACTION_STOP
+        }
+        startService(intent)
+
+        isSessionActive = false
+        testId = "PARTICIPANT_TEMP"
+        sessionId = ""
+        sessionToken = ""
+        currentAgeYears = 25
+        currentGender = "Prefer not to say"
+
+        holdingPhoneStatus = ActivityStatus.NOT_STARTED
+        tapPrecisionStatus = ActivityStatus.NOT_STARTED
+        reactionTimeStatus = ActivityStatus.NOT_STARTED
+        typingStatus = ActivityStatus.NOT_STARTED
+        gestureStatus = ActivityStatus.NOT_STARTED
+        scrollStatus = ActivityStatus.NOT_STARTED
+        dragDropStatus = ActivityStatus.NOT_STARTED
+        targetTrackingStatus = ActivityStatus.NOT_STARTED
+        sliderControlStatus = ActivityStatus.NOT_STARTED
+        visualSearchStatus = ActivityStatus.NOT_STARTED
+        navigationStatus = ActivityStatus.NOT_STARTED
+        multiTouchStatus = ActivityStatus.NOT_STARTED
+        gamingStatus = ActivityStatus.NOT_STARTED
+
+        getSharedPreferences(RecordingService.PREFS_NAME, MODE_PRIVATE)
+            .edit()
+            .putBoolean("consent_accepted", false)
+            .apply()
+
+        loadLastCsv()
+        showToast("Session reset for next participant.")
+        currentScreen = Screen.WELCOME
+    }
+
     private fun ensureSessionStarted() {
         if (!isSessionActive || sessionId.isBlank()) {
             startFallbackLocalSession()
@@ -610,11 +696,13 @@ class MainActivity : ComponentActivity() {
         result: String,
         attemptId: Int,
         durationMs: Long,
-        touchInfo: String
+        touchInfo: String,
+        gameMode: String = "standard"
     ) {
         val intent = Intent(this, RecordingService::class.java).apply {
             action = RecordingService.ACTION_LOG_EVENT
             putExtra(RecordingService.EXTRA_ACTIVITY, activity)
+            putExtra(RecordingService.EXTRA_GAME_MODE, gameMode)
             putExtra(RecordingService.EXTRA_EXPECTED_ACTION, expectedAction)
             putExtra(RecordingService.EXTRA_DETECTED_ACTION, detectedAction)
             putExtra(RecordingService.EXTRA_RESULT, result)
@@ -641,10 +729,23 @@ class MainActivity : ComponentActivity() {
         return files.map { file ->
             val lines = runCatching { file.readLines() }.getOrDefault(emptyList())
             val recordCount = (lines.size - 1).coerceAtLeast(0)
+            var recordedParticipantId = testId
+            var recordedSessionId = file.nameWithoutExtension
+
+            if (lines.size > 1) {
+                val cols = lines[1].split(",")
+                if (cols.size >= 5) {
+                    val p = cols[3].replace("\"", "").trim()
+                    val s = cols[4].replace("\"", "").trim()
+                    if (p.isNotBlank()) recordedParticipantId = p
+                    if (s.isNotBlank()) recordedSessionId = s
+                }
+            }
+
             SavedSession(
                 file = file,
-                sessionId = file.nameWithoutExtension,
-                testId = testId,
+                sessionId = recordedSessionId,
+                testId = recordedParticipantId,
                 records = recordCount
             )
         }.sortedByDescending { it.file.lastModified() }

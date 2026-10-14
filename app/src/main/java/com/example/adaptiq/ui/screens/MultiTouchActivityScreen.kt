@@ -55,7 +55,7 @@ fun MultiTouchActivityScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text(
-            text = "Activity 11 of 13: Multi-Touch",
+            text = "Activity 12 of 13: Multi-Touch",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )

@@ -1,5 +1,10 @@
 package com.example.adaptiq.ui.screens
 
+import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.SystemClock
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -7,11 +12,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.adaptiq.ui.components.PracticeHeader
 import kotlinx.coroutines.delay
+import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.sqrt
 
 @Composable
 fun HoldingThePhoneActivityScreen(
@@ -26,6 +37,7 @@ fun HoldingThePhoneActivityScreen(
     onActivityCompleted: () -> Unit,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
     val trialDurationSeconds = 15
     var isPractice by remember { mutableStateOf(true) }
     var secondsRemaining by remember { mutableIntStateOf(trialDurationSeconds) }
@@ -33,10 +45,53 @@ fun HoldingThePhoneActivityScreen(
     var isCompleted by remember { mutableStateOf(false) }
     var trialStartTime by remember { mutableLongStateOf(0L) }
 
+    // Live sensor stability metrics
+    var currentStabilityPct by remember { mutableFloatStateOf(95f) }
+    var stabilitySamplesCount by remember { mutableIntStateOf(0) }
+    var stabilitySum by remember { mutableFloatStateOf(0f) }
+
+    // Register live sensor listener to calculate device tremor / stability index
+    DisposableEffect(Unit) {
+        val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+        val accelerometer = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                if (event == null) return
+                val ax = event.values[0]
+                val ay = event.values[1]
+                val az = event.values[2]
+                val magnitude = sqrt((ax * ax) + (ay * ay) + (az * az))
+                // Ideal rest gravity is ~9.81 m/s^2; tremor is deviation from 9.81
+                val deviation = abs(magnitude - 9.80665f)
+                val stability = (100f - (deviation * 15f)).coerceIn(40f, 99f)
+                currentStabilityPct = stability
+
+                if (isRunning) {
+                    stabilitySamplesCount++
+                    stabilitySum += stability
+                }
+            }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+
+        accelerometer?.let {
+            sensorManager.registerListener(listener, it, SensorManager.SENSOR_DELAY_UI)
+        }
+
+        onDispose {
+            sensorManager?.unregisterListener(listener)
+        }
+    }
+
     // Countdown timer for active holding trial
     LaunchedEffect(isRunning) {
         if (isRunning) {
             trialStartTime = SystemClock.elapsedRealtime()
+            stabilitySamplesCount = 0
+            stabilitySum = 0f
+
             while (secondsRemaining > 0 && isRunning) {
                 delay(1000)
                 if (isRunning) {
@@ -47,6 +102,8 @@ fun HoldingThePhoneActivityScreen(
                 isRunning = false
                 isCompleted = true
                 val duration = SystemClock.elapsedRealtime() - trialStartTime
+                val meanStability = if (stabilitySamplesCount > 0) stabilitySum / stabilitySamplesCount else currentStabilityPct
+
                 if (!isPractice) {
                     onLogEvent(
                         "hold_phone_steady",
@@ -54,7 +111,7 @@ fun HoldingThePhoneActivityScreen(
                         "successful",
                         1,
                         duration,
-                        "duration_s=$trialDurationSeconds"
+                        String.format(Locale.US, "duration_s=%d,stability_pct=%.1f", trialDurationSeconds, meanStability)
                     )
                 }
             }
@@ -74,7 +131,7 @@ fun HoldingThePhoneActivityScreen(
         )
 
         Text(
-            text = "Hold your phone steady in a natural sitting position to record baseline stability.",
+            text = "Hold your phone steady in a natural sitting position to calibrate baseline posture and sensor stability.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -104,30 +161,78 @@ fun HoldingThePhoneActivityScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = if (isRunning) "⏱️ 00:%02d".format(secondsRemaining) else "Ready",
+                        text = if (isRunning) "⏱️ 00:%02d".format(secondsRemaining) else if (isPractice) "Practice Mode" else "Ready",
                         style = MaterialTheme.typography.displayMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(16.dp))
+
                     Text(
-                        text = if (isRunning) "Keep the phone steady and relaxed..." else "Tap 'Start Official Collection' above to begin baseline recording.",
+                        text = if (isRunning) {
+                            "Keep the phone steady and relaxed in your hand..."
+                        } else if (isPractice) {
+                            "Try holding your phone in your usual grip. Observe your live stability gauge below, then tap 'Start Data Collection' above when ready."
+                        } else {
+                            "Tap 'Start Official Collection' above to begin baseline recording."
+                        },
                         style = MaterialTheme.typography.bodyLarge,
                         textAlign = TextAlign.Center
                     )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Live Stability Gauge
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Device Stability",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "%.1f%%".format(currentStabilityPct),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = if (currentStabilityPct > 85f) Color(0xFF2E7D32) else Color(0xFFE65100)
+                            )
+                        }
+
+                        LinearProgressIndicator(
+                            progress = { currentStabilityPct / 100f },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(12.dp),
+                            color = if (currentStabilityPct > 85f) Color(0xFF4CAF50) else Color(0xFFFF9800),
+                            trackColor = MaterialTheme.colorScheme.surface
+                        )
+
+                        Text(
+                            text = if (currentStabilityPct > 88f) "🟢 Steady Hold" else "🟡 Motion Detected",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
             if (!isRunning && isPractice) {
                 Button(
                     onClick = {
-                        isPractice = false
                         secondsRemaining = trialDurationSeconds
                         isRunning = true
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Start Practice / Stance Calibration", fontWeight = FontWeight.Bold)
+                    Text("Start Practice Hold Timer (15s)", fontWeight = FontWeight.Bold)
                 }
             }
         } else {
@@ -137,9 +242,15 @@ fun HoldingThePhoneActivityScreen(
                 color = MaterialTheme.colorScheme.secondaryContainer
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("✓ Holding the Phone Completed!", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "✓ Holding the Phone Completed!",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("Baseline sensor calibration recorded successfully.")
+                    val finalStability = if (stabilitySamplesCount > 0) stabilitySum / stabilitySamplesCount else currentStabilityPct
+                    Text("Baseline posture and sensor stability recorded successfully (Mean stability: %.1f%%).".format(finalStability))
                 }
             }
 

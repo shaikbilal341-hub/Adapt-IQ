@@ -68,7 +68,7 @@ fun ReactionTimeActivityScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text(
-            text = "Activity 2 of 13: Reaction Time",
+            text = "Activity 3 of 13: Reaction Time",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )

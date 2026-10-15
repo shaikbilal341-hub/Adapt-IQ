@@ -79,6 +79,20 @@ router.post('/:sessionId/upload', authenticateToken, verifySessionOwnership, asy
             return res.status(404).json({ error: 'Session not found' });
         }
 
+        // Check if batch already processed for idempotency
+        const existingBatch = await prisma.uploadBatch.findFirst({
+            where: { sessionId, batchIndex: uploadData.batchIndex }
+        });
+
+        if (existingBatch) {
+            return res.json({
+                message: 'Batch already processed (idempotent)',
+                batchIndex: uploadData.batchIndex,
+                eventsProcessed: uploadData.events.length,
+                sensorsProcessed: uploadData.sensorSamples.length
+            });
+        }
+
         // Record upload batch
         await prisma.uploadBatch.create({
             data: {
@@ -175,7 +189,23 @@ router.get('/admin/export', authenticateToken, requireRole('RESEARCHER'), async 
             },
             orderBy: { createdAt: 'desc' }
         });
-        return res.json({ exportedAt: new Date().toISOString(), totalSessions: sessions.length, sessions });
+        const serializedSessions = sessions.map(session => ({
+            ...session,
+            events: session.events.map(ev => ({
+                ...ev,
+                eventId: ev.eventId.toString(),
+                timestamp: ev.timestamp.toString(),
+                elapsedMs: ev.elapsedMs.toString(),
+                durationMs: ev.durationMs.toString()
+            })),
+            sensorSamples: session.sensorSamples.map(s => ({
+                ...s,
+                timestamp: s.timestamp.toString(),
+                elapsedMs: s.elapsedMs.toString()
+            }))
+        }));
+
+        return res.json({ exportedAt: new Date().toISOString(), totalSessions: serializedSessions.length, sessions: serializedSessions });
     } catch (error: any) {
         console.error("Error in admin export:", error);
         return res.status(500).json({ error: error.message });

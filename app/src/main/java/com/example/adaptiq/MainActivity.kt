@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,9 +23,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.work.BackoffPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.WorkRequest
 import com.example.adaptiq.data.ActivityStatus
 import com.example.adaptiq.sync.AdaptIqHttpClient
 import com.example.adaptiq.sync.ParticipantSessionStartRequest
+import com.example.adaptiq.sync.SyncQueueManager
+import com.example.adaptiq.sync.SyncWorker
 import com.example.adaptiq.ui.screens.*
 import com.example.adaptiq.ui.theme.AdaptIQTheme
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +40,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 private enum class Screen {
     WELCOME,
@@ -116,6 +124,12 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun AdaptIQAppRouter() {
         val coroutineScope = rememberCoroutineScope()
+
+        if (currentScreen != Screen.HOME && currentScreen != Screen.WELCOME) {
+            BackHandler {
+                currentScreen = Screen.HOME
+            }
+        }
 
         when (currentScreen) {
             Screen.WELCOME -> WelcomeScreen(
@@ -205,8 +219,18 @@ class MainActivity : ComponentActivity() {
                 onBack = { currentScreen = Screen.HOME }
             )
             Screen.GAMING -> GamingActivityScreen(
-                onLogEvent = { exp, det, res, att, dur, touch -> logActionEvent("gaming", exp, det, res, att, dur, touch) },
-                onActivityCompleted = { gamingStatus = ActivityStatus.COMPLETED; currentScreen = Screen.HOME; checkSessionCompletion(); showToast("Gaming Interaction Completed") },
+                onLogEvent = { exp, det, res, att, dur, touch, gMode ->
+                    logActionEvent("gaming", exp, det, res, att, dur, touch, gMode)
+                },
+                onGameModeSelected = { selectedMode ->
+                    updateCurrentActivity("gaming", selectedMode)
+                },
+                onActivityCompleted = {
+                    gamingStatus = ActivityStatus.COMPLETED
+                    currentScreen = Screen.HOME
+                    checkSessionCompletion()
+                    showToast("Gaming Interaction Completed")
+                },
                 onBack = { currentScreen = Screen.HOME }
             )
             Screen.PREVIOUS_SESSIONS -> PreviousSessionsScreen()
@@ -244,23 +268,34 @@ class MainActivity : ComponentActivity() {
                 color = MaterialTheme.colorScheme.primary
             )
 
-            // Two Primary Actions prominently at the top
+            // 3 Primary Flow Actions prominently at the top
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(
                     onClick = { currentScreen = Screen.DEMOGRAPHICS },
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text(if (isSessionActive) "PARTICIPANT INFO" else "PROCEED TO TEST", fontWeight = FontWeight.Bold)
+                    Text(
+                        if (isSessionActive) "PARTICIPANT" else "CONDUCT TEST",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
                 }
 
                 OutlinedButton(
                     onClick = { currentScreen = Screen.PREVIOUS_SESSIONS },
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("PREVIOUS DATA", fontWeight = FontWeight.Bold)
+                    Text("PREVIOUS DATA", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                }
+
+                OutlinedButton(
+                    onClick = { currentScreen = Screen.EXPORT_DATASET },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("EXPORT DATA", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
             }
 
@@ -278,7 +313,7 @@ class MainActivity : ComponentActivity() {
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = if (isSessionActive) "Gender: $currentGender • Active Research Session" else "Zero PII • Local-First Storage • Tap 'Proceed to Test' to Begin",
+                        text = if (isSessionActive) "Gender: $currentGender • Active Research Session" else "Zero PII • Local-First Storage • Tap 'Conduct Test' to Begin",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                     )
@@ -304,13 +339,43 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
+            // Sync and Storage Status Card
+            val savedCount = remember { datasetsDirectory().listFiles { file -> file.isFile && file.extension.equals("csv", true) }?.size ?: 0 }
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Local & Sync Status", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "$savedCount Saved Local Sessions • Offline-First Queue Active",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Button(
+                        onClick = { submitDatasetToAdmin() },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0))
+                    ) {
+                        Text("Sync All", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+            }
+
             if (completedCount == totalActivities) {
                 Button(
                     onClick = { submitDatasetToAdmin() },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
                 ) {
-                    Text("Submit Dataset to Admin", fontWeight = FontWeight.Bold)
+                    Text("Submit Completed Dataset to Admin", fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -466,6 +531,7 @@ class MainActivity : ComponentActivity() {
                                 Text("${session.testId} • ${session.records} Records")
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     OutlinedButton(onClick = { shareFile(session.file) }) { Text("Export CSV") }
+                                    OutlinedButton(onClick = { queueAndUploadFile(session.file) }) { Text("Upload") }
                                     OutlinedButton(onClick = { session.file.delete(); showToast("Deleted") }) { Text("Delete") }
                                 }
                             }
@@ -481,17 +547,52 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun ExportDatasetScreen() {
+        loadLastCsv()
+        val lastFile = lastCsvPath?.let { File(it) }
+        val sessions = getSavedSessions()
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(20.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text("Dataset Export & Submission", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Text("Export local CSV dataset or submit completed research session to admin backend.")
 
-            Button(onClick = { shareLastCsv() }, modifier = Modifier.fillMaxWidth()) {
-                Text("Export Local CSV Dataset")
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Latest Recorded CSV Dataset", fontWeight = FontWeight.Bold)
+                    if (lastFile != null && lastFile.exists()) {
+                        val recordCount = runCatching {
+                            var count = 0
+                            lastFile.bufferedReader().use { reader ->
+                                if (reader.readLine() != null) {
+                                    while (reader.readLine() != null) {
+                                        count++
+                                    }
+                                }
+                            }
+                            count
+                        }.getOrDefault(0)
+                        Text("File: ${lastFile.name}", style = MaterialTheme.typography.bodySmall)
+                        Text("Size: ${lastFile.length() / 1024} KB • Records: $recordCount rows", style = MaterialTheme.typography.bodySmall)
+                        Text("Storage: Local durable isolated storage", style = MaterialTheme.typography.bodySmall, color = Color(0xFF2E7D32))
+                    } else {
+                        Text("No active session recording file found.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+
+            Button(
+                onClick = { shareLastCsv() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Export Local CSV Dataset (Share Sheet)")
             }
 
             Button(
@@ -499,11 +600,22 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
             ) {
-                Text("Submit Dataset to Admin", fontWeight = FontWeight.Bold)
+                Text("Submit Dataset to Admin Server", fontWeight = FontWeight.Bold)
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f))
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Sync Queue Status", fontWeight = FontWeight.Bold)
+                    Text("Total saved local session files: ${sessions.size}")
+                    Text("Background retry policy: Exponential backoff with WorkManager")
+                }
             }
 
             OutlinedButton(onClick = { currentScreen = Screen.HOME }, modifier = Modifier.fillMaxWidth()) {
-                Text("Back")
+                Text("Back to Dashboard")
             }
         }
     }
@@ -604,11 +716,30 @@ class MainActivity : ComponentActivity() {
         currentScreen = Screen.HOME
     }
 
+    private fun markActivityInProgress(activityName: String) {
+        when (activityName) {
+            "holding_phone" -> if (holdingPhoneStatus == ActivityStatus.NOT_STARTED) holdingPhoneStatus = ActivityStatus.IN_PROGRESS
+            "tap_precision" -> if (tapPrecisionStatus == ActivityStatus.NOT_STARTED) tapPrecisionStatus = ActivityStatus.IN_PROGRESS
+            "reaction_time" -> if (reactionTimeStatus == ActivityStatus.NOT_STARTED) reactionTimeStatus = ActivityStatus.IN_PROGRESS
+            "typing" -> if (typingStatus == ActivityStatus.NOT_STARTED) typingStatus = ActivityStatus.IN_PROGRESS
+            "gestures" -> if (gestureStatus == ActivityStatus.NOT_STARTED) gestureStatus = ActivityStatus.IN_PROGRESS
+            "scrolling" -> if (scrollStatus == ActivityStatus.NOT_STARTED) scrollStatus = ActivityStatus.IN_PROGRESS
+            "drag_drop" -> if (dragDropStatus == ActivityStatus.NOT_STARTED) dragDropStatus = ActivityStatus.IN_PROGRESS
+            "target_tracking" -> if (targetTrackingStatus == ActivityStatus.NOT_STARTED) targetTrackingStatus = ActivityStatus.IN_PROGRESS
+            "slider_control" -> if (sliderControlStatus == ActivityStatus.NOT_STARTED) sliderControlStatus = ActivityStatus.IN_PROGRESS
+            "visual_search" -> if (visualSearchStatus == ActivityStatus.NOT_STARTED) visualSearchStatus = ActivityStatus.IN_PROGRESS
+            "navigation" -> if (navigationStatus == ActivityStatus.NOT_STARTED) navigationStatus = ActivityStatus.IN_PROGRESS
+            "multi_touch" -> if (multiTouchStatus == ActivityStatus.NOT_STARTED) multiTouchStatus = ActivityStatus.IN_PROGRESS
+            "gaming" -> if (gamingStatus == ActivityStatus.NOT_STARTED) gamingStatus = ActivityStatus.IN_PROGRESS
+        }
+    }
+
     private fun navigateToActivity(activityName: String, screen: Screen) {
         if (!isSessionActive || sessionId.isBlank()) {
             showToast("Please complete participant details first to start research session")
             currentScreen = Screen.DEMOGRAPHICS
         } else {
+            markActivityInProgress(activityName)
             updateCurrentActivity(activityName)
             currentScreen = screen
         }
@@ -684,9 +815,63 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun queueAndUploadFile(file: File) {
+        val queueManager = SyncQueueManager.getInstance(this)
+        queueManager.queueCompletedSession(
+            sessionId = file.nameWithoutExtension,
+            testId = testId,
+            csvFile = file,
+            orientation = if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) "landscape" else "portrait"
+        )
+        val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setBackoffCriteria(
+                BackoffPolicy.EXPONENTIAL,
+                WorkRequest.MIN_BACKOFF_MILLIS,
+                TimeUnit.MILLISECONDS
+            )
+            .build()
+        WorkManager.getInstance(this).enqueue(syncRequest)
+        showToast("Session queued for upload. SyncWorker scheduled.")
+    }
+
     private fun submitDatasetToAdmin() {
-        showToast("Submitting dataset to backend admin...")
-        // Triggers WorkManager / sync upload queue
+        val lastFile = lastCsvPath?.let { File(it) }
+        val directory = datasetsDirectory()
+        val filesToQueue = mutableListOf<File>()
+
+        if (lastFile != null && lastFile.exists()) {
+            filesToQueue.add(lastFile)
+        } else if (directory.exists()) {
+            directory.listFiles { file -> file.isFile && file.extension.equals("csv", true) }?.let {
+                filesToQueue.addAll(it)
+            }
+        }
+
+        if (filesToQueue.isEmpty()) {
+            showToast("No CSV research recordings found to upload.")
+            return
+        }
+
+        val queueManager = SyncQueueManager.getInstance(this)
+        for (file in filesToQueue) {
+            queueManager.queueCompletedSession(
+                sessionId = file.nameWithoutExtension,
+                testId = testId,
+                csvFile = file,
+                orientation = if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) "landscape" else "portrait"
+            )
+        }
+
+        val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setBackoffCriteria(
+                BackoffPolicy.EXPONENTIAL,
+                WorkRequest.MIN_BACKOFF_MILLIS,
+                TimeUnit.MILLISECONDS
+            )
+            .build()
+        WorkManager.getInstance(this).enqueue(syncRequest)
+
+        showToast("Queued ${filesToQueue.size} sessions for upload. Background sync initiated.")
     }
 
     private fun logActionEvent(
@@ -727,18 +912,29 @@ class MainActivity : ComponentActivity() {
         } ?: return emptyList()
 
         return files.map { file ->
-            val lines = runCatching { file.readLines() }.getOrDefault(emptyList())
-            val recordCount = (lines.size - 1).coerceAtLeast(0)
+            var recordCount = 0
             var recordedParticipantId = testId
             var recordedSessionId = file.nameWithoutExtension
 
-            if (lines.size > 1) {
-                val cols = lines[1].split(",")
-                if (cols.size >= 5) {
-                    val p = cols[3].replace("\"", "").trim()
-                    val s = cols[4].replace("\"", "").trim()
-                    if (p.isNotBlank()) recordedParticipantId = p
-                    if (s.isNotBlank()) recordedSessionId = s
+            runCatching {
+                file.bufferedReader().use { reader ->
+                    val header = reader.readLine()
+                    if (header != null) {
+                        val firstData = reader.readLine()
+                        if (firstData != null) {
+                            recordCount = 1
+                            val cols = firstData.split(",")
+                            if (cols.size >= 5) {
+                                val p = cols[3].replace("\"", "").trim()
+                                val s = cols[4].replace("\"", "").trim()
+                                if (p.isNotBlank()) recordedParticipantId = p
+                                if (s.isNotBlank()) recordedSessionId = s
+                            }
+                            while (reader.readLine() != null) {
+                                recordCount++
+                            }
+                        }
+                    }
                 }
             }
 

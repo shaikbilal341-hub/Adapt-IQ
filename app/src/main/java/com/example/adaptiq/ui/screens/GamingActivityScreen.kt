@@ -264,9 +264,9 @@ fun GamingActivityScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("🏃 Runner Game (Temple Run–Inspired)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("🏃 3D Perspective Runner", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("3-lane 3D perspective runner. Swipe or use buttons to dodge roadblocks, jump track hurdles, and slide under overhead arches.")
+                    Text("3-lane 3D perspective runner. Swipe on the gameplay track to dodge roadblocks, jump track hurdles, and slide under overhead arches.")
                 }
             }
 
@@ -343,55 +343,38 @@ fun GamingActivityScreen(
             }
 
             if (trialResults == null) {
-                if (isGamePaused) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(280.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(
-                                text = "⏸️ GAME PAUSED\nActive trial countdown is frozen.\nTap 'Resume' to continue gameplay.",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                } else {
-                    when (gameMode) {
-                        GamingMode.RUNNER -> {
-                            RunnerGameView(
-                                trialAttemptId = currentAttemptId,
-                                isGameRunning = isGameRunning,
-                                isPractice = isPractice,
-                                onStartPractice = {
-                                    isGameRunning = true
-                                    isGamePaused = false
-                                },
-                                onLogEvent = { exp, det, res, att, dur, touch ->
-                                    onLogEvent(exp, det, res, att, dur, touch, "runner")
-                                },
-                                onTrialFinished = { results ->
-                                    trialResults = results
-                                    if (!isPractice) {
-                                        onLogEvent(
-                                            "complete_trial",
-                                            "completed_30s",
-                                            "successful",
-                                            currentAttemptId,
-                                            30_000L,
-                                            "score=${results.score},avoided=${results.avoidedTotal},collisions=${results.collisionsTotal}",
-                                            "runner"
-                                        )
-                                    }
+                when (gameMode) {
+                    GamingMode.RUNNER -> {
+                        RunnerGameView(
+                            trialAttemptId = currentAttemptId,
+                            isGameRunning = isGameRunning,
+                            isGamePaused = isGamePaused,
+                            isPractice = isPractice,
+                            onStartPractice = {
+                                isGameRunning = true
+                                isGamePaused = false
+                            },
+                            onLogEvent = { exp, det, res, att, dur, touch ->
+                                onLogEvent(exp, det, res, att, dur, touch, "runner")
+                            },
+                            onTrialFinished = { results ->
+                                trialResults = results
+                                if (!isPractice) {
+                                    onLogEvent(
+                                        "complete_trial",
+                                        "completed_30s",
+                                        "successful",
+                                        currentAttemptId,
+                                        30_000L,
+                                        "score=${results.score},avoided=${results.avoidedTotal},collisions=${results.collisionsTotal}",
+                                        "runner"
+                                    )
                                 }
-                            )
-                        }
-
-                        else -> {}
+                            }
+                        )
                     }
+
+                    else -> {}
                 }
             }
 
@@ -497,12 +480,13 @@ data class RunnerObstacle(
 )
 
 /**
- * 1. RUNNER GAME VIEW (Temple Run–Inspired)
+ * 1. RUNNER GAME VIEW (Swipe-Based 3D Perspective Mini-Game)
  */
 @Composable
 private fun RunnerGameView(
     trialAttemptId: Int = 1,
     isGameRunning: Boolean,
+    isGamePaused: Boolean = false,
     isPractice: Boolean,
     onStartPractice: () -> Unit,
     onLogEvent: (expectedAction: String, detectedAction: String, result: String, attemptId: Int, durationMs: Long, touchInfo: String) -> Unit,
@@ -512,7 +496,7 @@ private fun RunnerGameView(
     var isJumping by remember { mutableStateOf(false) }
     var isSliding by remember { mutableStateOf(false) }
     var score by remember { mutableIntStateOf(0) }
-    var statusText by remember { mutableStateOf("Swipe or use controls to dodge roadblocks, jump, and slide!") }
+    var statusText by remember { mutableStateOf("Swipe on track: ◀ Left • Right ▶ • ▲ Jump • ▼ Slide") }
     var collisionFlash by remember { mutableStateOf(false) }
 
     var obstaclesEncountered by remember { mutableIntStateOf(0) }
@@ -533,6 +517,10 @@ private fun RunnerGameView(
     LaunchedEffect(isGameRunning) {
         var lastSpawnTime = SystemClock.elapsedRealtime()
         while (isGameRunning) {
+            if (isGamePaused) {
+                delay(100L)
+                continue
+            }
             val now = SystemClock.elapsedRealtime()
             roadScrollOffset = (roadScrollOffset + 0.045f) % 1f
 
@@ -684,7 +672,7 @@ private fun RunnerGameView(
     }
 
     fun handleJump() {
-        if (!isJumping && isGameRunning) {
+        if (!isJumping && isGameRunning && !isGamePaused) {
             isJumping = true
             actionsCount++
             pendingReactionTime = SystemClock.elapsedRealtime()
@@ -694,7 +682,7 @@ private fun RunnerGameView(
     }
 
     fun handleSlide() {
-        if (!isSliding && isGameRunning) {
+        if (!isSliding && isGameRunning && !isGamePaused) {
             isSliding = true
             actionsCount++
             pendingReactionTime = SystemClock.elapsedRealtime()
@@ -704,22 +692,30 @@ private fun RunnerGameView(
     }
 
     fun handleMoveLeft() {
-        if (playerLane > 0 && isGameRunning) {
-            playerLane--
+        if (isGameRunning && !isGamePaused) {
             actionsCount++
             pendingReactionTime = SystemClock.elapsedRealtime()
             pendingDetectedAction = "swipe_left"
-            statusText = "◀ Switched to Lane $playerLane"
+            if (playerLane > 0) {
+                playerLane--
+                statusText = "◀ Switched to Lane $playerLane"
+            } else {
+                statusText = "◀ Already at leftmost lane"
+            }
         }
     }
 
     fun handleMoveRight() {
-        if (playerLane < 2 && isGameRunning) {
-            playerLane++
+        if (isGameRunning && !isGamePaused) {
             actionsCount++
             pendingReactionTime = SystemClock.elapsedRealtime()
             pendingDetectedAction = "swipe_right"
-            statusText = "Switched to Lane $playerLane ▶"
+            if (playerLane < 2) {
+                playerLane++
+                statusText = "Switched to Lane $playerLane ▶"
+            } else {
+                statusText = "Already at rightmost lane ▶"
+            }
         }
     }
 
@@ -731,13 +727,14 @@ private fun RunnerGameView(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(260.dp)
+                .height(270.dp)
                 .background(if (collisionFlash) Color(0xFF450A0A) else Color(0xFF0F172A), shape = RoundedCornerShape(16.dp))
-                .pointerInput(isGameRunning) {
-                    if (isGameRunning) {
+                .pointerInput(isGameRunning, isGamePaused) {
+                    if (isGameRunning && !isGamePaused) {
                         var dragX = 0f
                         var dragY = 0f
                         var gestureHandled = false
+                        val swipeThreshold = 40f
 
                         detectDragGestures(
                             onDragStart = {
@@ -748,18 +745,25 @@ private fun RunnerGameView(
                             onDragEnd = {
                                 gestureHandled = false
                             },
+                            onDragCancel = {
+                                gestureHandled = false
+                            },
                             onDrag = { _, dragAmount ->
                                 if (!gestureHandled) {
                                     dragX += dragAmount.x
                                     dragY += dragAmount.y
-                                    val threshold = 30f
+                                    val absX = abs(dragX)
+                                    val absY = abs(dragY)
 
-                                    if (abs(dragX) > abs(dragY) && abs(dragX) > threshold) {
-                                        if (dragX > 0) handleMoveRight() else handleMoveLeft()
-                                        gestureHandled = true
-                                    } else if (abs(dragY) > abs(dragX) && abs(dragY) > threshold) {
-                                        if (dragY < 0) handleJump() else handleSlide()
-                                        gestureHandled = true
+                                    if (absX >= swipeThreshold || absY >= swipeThreshold) {
+                                        // Strict dominant axis checking (>= 1.3x) to reject ambiguous diagonal gestures
+                                        if (absX > absY * 1.3f) {
+                                            gestureHandled = true
+                                            if (dragX > 0f) handleMoveRight() else handleMoveLeft()
+                                        } else if (absY > absX * 1.3f) {
+                                            gestureHandled = true
+                                            if (dragY < 0f) handleJump() else handleSlide()
+                                        }
                                     }
                                 }
                             }
@@ -922,37 +926,43 @@ private fun RunnerGameView(
                     fontSize = 12.sp
                 )
             }
-        }
 
-        // On-Screen Controls (Buttons + Gesture Support)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { handleMoveLeft() }, enabled = isGameRunning && playerLane > 0) {
-                    Text("◀ Left")
-                }
-                Button(onClick = { handleMoveRight() }, enabled = isGameRunning && playerLane < 2) {
-                    Text("Right ▶")
+            if (isGamePaused) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = Color.Black.copy(alpha = 0.75f),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "⏸️ GAME PAUSED\nActive trial countdown is frozen.\nTap 'Resume' to continue gameplay.",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
+        }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = { handleJump() },
-                    enabled = isGameRunning,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
-                ) {
-                    Text("▲ Jump")
-                }
-                Button(
-                    onClick = { handleSlide() },
-                    enabled = isGameRunning,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFA855F7))
-                ) {
-                    Text("▼ Slide")
-                }
+        // Gesture Guide HUD (Pure Touch Swipe Controls: No On-Screen Movement Buttons)
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("◀ Swipe Left", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text("Swipe Right ▶", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text("▲ Swipe Up: Jump", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFEF4444))
+                Text("▼ Swipe Down: Slide", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFA855F7))
             }
         }
 

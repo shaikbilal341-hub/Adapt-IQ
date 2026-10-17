@@ -325,6 +325,63 @@ class SyncQueueManager(context: Context) : SQLiteOpenHelper(context, DATABASE_NA
         return list
     }
 
+    fun getAllSessions(): List<QueuedSession> {
+        val list = mutableListOf<QueuedSession>()
+        val db = readableDatabase
+        val cursor = db.query(
+            TABLE_SESSIONS,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "start_time DESC"
+        )
+        cursor.use {
+            while (it.moveToNext()) {
+                list.add(
+                    QueuedSession(
+                        sessionId = it.getString(it.getColumnIndexOrThrow("session_id")),
+                        testId = it.getString(it.getColumnIndexOrThrow("test_id")),
+                        startTime = it.getLong(it.getColumnIndexOrThrow("start_time")),
+                        endTime = if (it.isNull(it.getColumnIndexOrThrow("end_time"))) null else it.getLong(it.getColumnIndexOrThrow("end_time")),
+                        orientation = it.getString(it.getColumnIndexOrThrow("orientation")),
+                        deviceModel = it.getString(it.getColumnIndexOrThrow("device_model")),
+                        status = it.getString(it.getColumnIndexOrThrow("status"))
+                    )
+                )
+            }
+        }
+        return list
+    }
+
+    fun registerSessionStart(
+        sessionId: String,
+        testId: String,
+        orientation: String = "portrait",
+        deviceModel: String = "Normalized Android Device"
+    ) {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put("session_id", sessionId)
+            put("test_id", testId)
+            put("start_time", System.currentTimeMillis())
+            put("orientation", orientation)
+            put("device_model", deviceModel)
+            put("status", "IN_PROGRESS")
+        }
+        db.insertWithOnConflict(TABLE_SESSIONS, null, values, SQLiteDatabase.CONFLICT_REPLACE)
+    }
+
+    fun markSessionCompleted(sessionId: String) {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put("end_time", System.currentTimeMillis())
+            put("status", "COMPLETED")
+        }
+        db.update(TABLE_SESSIONS, values, "session_id = ?", arrayOf(sessionId))
+    }
+
     fun getEventsForSession(sessionId: String): List<ActionEventDto> {
         val list = mutableListOf<ActionEventDto>()
         val db = readableDatabase

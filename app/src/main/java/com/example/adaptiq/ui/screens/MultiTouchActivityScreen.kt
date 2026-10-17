@@ -19,6 +19,7 @@ import com.example.adaptiq.ui.theme.*
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.Locale
 import kotlin.math.abs
 
 @Composable
@@ -80,7 +81,7 @@ fun MultiTouchActivityScreen(
                         color = TextPrimary
                     )
                     Text(
-                        text = "Scale: ${String.format("%.2f", scale)}x",
+                        text = "Scale: ${String.format(Locale.US, "%.2f", scale)}x",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = AccentTeal

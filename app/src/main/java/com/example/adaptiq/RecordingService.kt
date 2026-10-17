@@ -1,6 +1,5 @@
 package com.example.adaptiq
 
-import android.R
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -488,7 +487,7 @@ class RecordingService : Service(), SensorEventListener {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Adapt-IQ Research Session Active")
             .setContentText("Collecting anonymous interaction data for $activity")
-            .setSmallIcon(R.drawable.ic_menu_compass)
+            .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }

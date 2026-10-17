@@ -1,6 +1,7 @@
 package com.example.adaptiq.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,7 +14,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.adaptiq.ui.components.PracticeHeader
+import com.example.adaptiq.ui.components.*
+import com.example.adaptiq.ui.theme.*
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -48,22 +50,10 @@ fun MultiTouchActivityScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Text(
-            text = "Activity 12 of 13: Multi-Touch",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = "Perform a controlled two-finger pinch or spread gesture.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+    AdaptIQScreenContainer(scrollable = false) {
+        AdaptIQSectionHeader(
+            title = "Activity 12 of 13: Multi-Touch",
+            subtitle = "Perform a controlled two-finger pinch or spread gesture."
         )
 
         PracticeHeader(
@@ -78,24 +68,36 @@ fun MultiTouchActivityScreen(
         )
 
         if (!isCompleted) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(text = "Trial $currentTrial of $totalTrials", fontWeight = FontWeight.Bold)
-                Text(text = "Scale: ${String.format("%.2f", scale)}x")
-            }
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Trial $currentTrial of $totalTrials",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = "Scale: ${String.format("%.2f", scale)}x",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = AccentTeal
+                    )
+                }
 
-            LinearProgressIndicator(
-                progress = { currentTrial.toFloat() / totalTrials.toFloat() },
-                modifier = Modifier.fillMaxWidth().height(8.dp)
-            )
+                AdaptIQProgressIndicator(
+                    progress = currentTrial.toFloat() / totalTrials.toFloat()
+                )
+            }
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .background(MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(16.dp))
+                    .background(SurfaceElevatedVariant, shape = RoundedCornerShape(20.dp))
+                    .border(1.dp, BorderSubtle, RoundedCornerShape(20.dp))
                     .pointerInput(Unit) {
                         detectTransformGestures { _, _, zoom, _ ->
                             scale *= zoom
@@ -125,57 +127,61 @@ fun MultiTouchActivityScreen(
                 Box(
                     modifier = Modifier
                         .size((120 * scale).coerceIn(60f, 220f).dp)
-                        .background(MaterialTheme.colorScheme.primary, shape = RoundedCornerShape(16.dp)),
+                        .background(AccentTeal, shape = RoundedCornerShape(20.dp))
+                        .border(2.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(20.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "Pinch / Spread",
-                        color = Color.White,
+                        color = BackgroundDark,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
                     )
                 }
             }
 
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.fillMaxWidth()
+            AdaptIQSurfaceCard(
+                borderColor = if (feedbackText.startsWith("✓")) StatusSuccess.copy(alpha = 0.5f) else BorderSubtle,
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
             ) {
                 Text(
                     text = feedbackText,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = if (feedbackText.startsWith("✓")) StatusSuccess else TextPrimary,
                     fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(10.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center
                 )
             }
         } else {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer
+            AdaptIQSurfaceCard(
+                borderColor = StatusSuccess.copy(alpha = 0.5f)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("✓ Multi-Touch Completed!", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("All $totalTrials multi-touch trials recorded successfully.")
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "✓ Multi-Touch Completed!",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = StatusSuccess
+                    )
+                    Text(
+                        text = "All $totalTrials multi-touch trials recorded successfully.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
                 }
             }
 
-            Button(
-                onClick = onActivityCompleted,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Continue to Next Activity", fontWeight = FontWeight.Bold)
-            }
+            Spacer(modifier = Modifier.weight(1f))
+
+            AdaptIQPrimaryButton(
+                text = "Continue to Next Activity",
+                onClick = onActivityCompleted
+            )
         }
 
-        OutlinedButton(
-            onClick = onBack,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Back")
-        }
+        AdaptIQOutlinedButton(
+            text = "Back",
+            onClick = onBack
+        )
     }
 }

@@ -1,6 +1,7 @@
 package com.example.adaptiq.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -16,11 +17,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.example.adaptiq.ui.components.PracticeHeader
+import com.example.adaptiq.ui.components.*
+import com.example.adaptiq.ui.theme.*
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.sqrt
 import kotlin.math.roundToInt
 
 @Composable
@@ -52,22 +53,10 @@ fun TargetTrackingActivityScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Text(
-            text = "Activity 8 of 13: Target Tracking",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = "Follow the moving target with your finger.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+    AdaptIQScreenContainer(scrollable = false) {
+        AdaptIQSectionHeader(
+            title = "Activity 8 of 13: Target Tracking",
+            subtitle = "Follow the moving target with your finger."
         )
 
         PracticeHeader(
@@ -81,24 +70,36 @@ fun TargetTrackingActivityScreen(
         )
 
         if (!isCompleted) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(text = "Trial $currentTrial of $totalTrials", fontWeight = FontWeight.Bold)
-                Text(text = "${(currentTrial.toFloat() / totalTrials.toFloat() * 100).toInt()}%")
-            }
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Trial $currentTrial of $totalTrials",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = "${(currentTrial.toFloat() / totalTrials.toFloat() * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = AccentTeal
+                    )
+                }
 
-            LinearProgressIndicator(
-                progress = { currentTrial.toFloat() / totalTrials.toFloat() },
-                modifier = Modifier.fillMaxWidth().height(8.dp)
-            )
+                AdaptIQProgressIndicator(
+                    progress = currentTrial.toFloat() / totalTrials.toFloat()
+                )
+            }
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .background(MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(16.dp))
+                    .background(SurfaceElevatedVariant, shape = RoundedCornerShape(20.dp))
+                    .border(1.dp, BorderSubtle, RoundedCornerShape(20.dp))
                     .pointerInput(Unit) {
                         detectDragGestures(
                             onDragEnd = {
@@ -131,10 +132,11 @@ fun TargetTrackingActivityScreen(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(60.dp)
+                        .size(68.dp)
                         .offset { IntOffset(targetOffsetX.roundToInt(), targetOffsetY.roundToInt()) }
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
+                        .background(AccentTeal)
+                        .border(3.dp, Color.White.copy(alpha = 0.8f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Box(
@@ -146,45 +148,48 @@ fun TargetTrackingActivityScreen(
                 }
             }
 
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.fillMaxWidth()
+            AdaptIQSurfaceCard(
+                borderColor = BorderSubtle,
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
             ) {
                 Text(
                     text = feedbackText,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = TextPrimary,
                     fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(10.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center
                 )
             }
         } else {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer
+            AdaptIQSurfaceCard(
+                borderColor = StatusSuccess.copy(alpha = 0.5f)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("✓ Target Tracking Completed!", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("All $totalTrials tracking trials recorded successfully.")
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "✓ Target Tracking Completed!",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = StatusSuccess
+                    )
+                    Text(
+                        text = "All $totalTrials tracking trials recorded successfully.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
                 }
             }
 
-            Button(
-                onClick = onActivityCompleted,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Continue to Next Activity", fontWeight = FontWeight.Bold)
-            }
+            Spacer(modifier = Modifier.weight(1f))
+
+            AdaptIQPrimaryButton(
+                text = "Continue to Next Activity",
+                onClick = onActivityCompleted
+            )
         }
 
-        OutlinedButton(
-            onClick = onBack,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Back")
-        }
+        AdaptIQOutlinedButton(
+            text = "Back",
+            onClick = onBack
+        )
     }
 }

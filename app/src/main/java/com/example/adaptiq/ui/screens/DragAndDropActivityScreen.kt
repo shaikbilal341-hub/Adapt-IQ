@@ -1,6 +1,7 @@
 package com.example.adaptiq.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -8,14 +9,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.example.adaptiq.ui.components.PracticeHeader
+import androidx.compose.ui.unit.sp
+import com.example.adaptiq.ui.components.*
+import com.example.adaptiq.ui.theme.*
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -53,22 +55,10 @@ fun DragAndDropActivityScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Text(
-            text = "Activity 7 of 13: Drag & Drop",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = "Drag the object into the destination target box.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+    AdaptIQScreenContainer(scrollable = false) {
+        AdaptIQSectionHeader(
+            title = "Activity 7 of 13: Drag & Drop",
+            subtitle = "Drag the object into the destination target box."
         )
 
         PracticeHeader(
@@ -79,29 +69,41 @@ fun DragAndDropActivityScreen(
                 isCompleted = false
                 offsetX = 0f
                 offsetY = 0f
-                feedbackText = "Drag the blue shape into the target box."
+                feedbackText = "Drag the shape into the target box."
             }
         )
 
         if (!isCompleted) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(text = "Trial $currentTrial of $totalTrials", fontWeight = FontWeight.Bold)
-                Text(text = "${(currentTrial.toFloat() / totalTrials.toFloat() * 100).toInt()}%")
-            }
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Trial $currentTrial of $totalTrials",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = "${(currentTrial.toFloat() / totalTrials.toFloat() * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = AccentTeal
+                    )
+                }
 
-            LinearProgressIndicator(
-                progress = { currentTrial.toFloat() / totalTrials.toFloat() },
-                modifier = Modifier.fillMaxWidth().height(8.dp)
-            )
+                AdaptIQProgressIndicator(
+                    progress = currentTrial.toFloat() / totalTrials.toFloat()
+                )
+            }
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .background(MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(16.dp))
+                    .background(SurfaceElevatedVariant, shape = RoundedCornerShape(20.dp))
+                    .border(1.dp, BorderSubtle, RoundedCornerShape(20.dp))
                     .padding(16.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -113,9 +115,10 @@ fun DragAndDropActivityScreen(
                     // Draggable Shape
                     Box(
                         modifier = Modifier
-                            .size(70.dp)
+                            .size(76.dp)
                             .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
-                            .background(MaterialTheme.colorScheme.primary, shape = RoundedCornerShape(12.dp))
+                            .background(AccentTeal, shape = RoundedCornerShape(16.dp))
+                            .border(2.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(16.dp))
                             .pointerInput(Unit) {
                                 detectDragGestures(
                                     onDragEnd = {
@@ -158,7 +161,7 @@ fun DragAndDropActivityScreen(
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("Drag Me", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("Drag Me", color = BackgroundDark, fontWeight = FontWeight.Bold)
                     }
 
                     // Target Box
@@ -166,53 +169,62 @@ fun DragAndDropActivityScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(90.dp)
-                            .background(MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(12.dp)),
+                            .background(SurfaceElevated, shape = RoundedCornerShape(14.dp))
+                            .border(2.dp, AccentBlue.copy(alpha = 0.6f), RoundedCornerShape(14.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("TARGET DROP BOX", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                        Text(
+                            text = "TARGET DROP BOX",
+                            fontWeight = FontWeight.Bold,
+                            color = AccentBlue,
+                            letterSpacing = 1.sp
+                        )
                     }
                 }
             }
 
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.fillMaxWidth()
+            AdaptIQSurfaceCard(
+                borderColor = BorderSubtle,
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
             ) {
                 Text(
                     text = feedbackText,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = TextPrimary,
                     fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(10.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center
                 )
             }
         } else {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer
+            AdaptIQSurfaceCard(
+                borderColor = StatusSuccess.copy(alpha = 0.5f)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("✓ Drag & Drop Completed!", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("All $totalTrials trials completed successfully.")
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "✓ Drag & Drop Completed!",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = StatusSuccess
+                    )
+                    Text(
+                        text = "All $totalTrials trials completed successfully.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
                 }
             }
 
-            Button(
-                onClick = onActivityCompleted,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Continue to Next Activity", fontWeight = FontWeight.Bold)
-            }
+            Spacer(modifier = Modifier.weight(1f))
+
+            AdaptIQPrimaryButton(
+                text = "Continue to Next Activity",
+                onClick = onActivityCompleted
+            )
         }
 
-        OutlinedButton(
-            onClick = onBack,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Back")
-        }
+        AdaptIQOutlinedButton(
+            text = "Back",
+            onClick = onBack
+        )
     }
 }

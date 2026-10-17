@@ -1,18 +1,25 @@
 package com.example.adaptiq.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.adaptiq.ui.components.*
+import com.example.adaptiq.ui.theme.*
 
+/**
+ * Available Actions Screen:
+ * - Genuine supported participant utilities and system actions
+ * - Deep navy surface cards with clear action affordances
+ */
 @Composable
 fun AvailableActionsScreen(
     isSessionActive: Boolean,
@@ -23,184 +30,219 @@ fun AvailableActionsScreen(
     onResetSession: () -> Unit,
     onBack: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
+    AdaptIQScreenContainer {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(20.dp)
+                .padding(horizontal = 20.dp, vertical = 24.dp)
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = "Available Actions",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-
-            Text(
-                text = "Supported research system actions and participant utilities.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            AdaptIQSectionHeader(
+                title = "Available Actions",
+                subtitle = "Supported research system actions and participant utilities",
+                badgeText = "SYSTEM UTILITIES"
             )
 
             // 1. Review Study Protocol & Privacy Policy
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+            AdaptIQSurfaceCard(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "1. Research Protocol & Privacy Details",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Review full study objectives, ethics disclosures, zero PII safeguards, and data governance policies at any time.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    OutlinedButton(
-                        onClick = onViewPrivacy,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp)
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = SurfaceElevatedVariant,
+                        border = BorderStroke(1.dp, BorderSubtle),
+                        modifier = Modifier.size(40.dp)
                     ) {
-                        Text("View Privacy & Study Information", fontWeight = FontWeight.SemiBold)
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(text = "📜", fontSize = 18.sp)
+                        }
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "Research Protocol & Privacy Details",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = "Study objectives, ethics disclosures, and zero PII safeguards",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                AdaptIQSecondaryButton(
+                    text = "View Privacy & Study Information",
+                    onClick = onViewPrivacy,
+                    modifier = Modifier.fillMaxWidth(),
+                    height = 46.dp
+                )
             }
 
             // 2. Offline Synchronization
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+            AdaptIQSurfaceCard(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Text(
-                            text = "2. Background Cloud Sync",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (pendingSyncCount > 0) Color(0xFFFFF3E0) else Color(0xFFE8F5E9)
+                            shape = RoundedCornerShape(10.dp),
+                            color = SurfaceElevatedVariant,
+                            border = BorderStroke(1.dp, BorderSubtle),
+                            modifier = Modifier.size(40.dp)
                         ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(text = "☁️", fontSize = 18.sp)
+                            }
+                        }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(
-                                text = "$pendingSyncCount Pending",
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                fontSize = 11.sp,
+                                text = "Background Cloud Sync",
+                                style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = if (pendingSyncCount > 0) Color(0xFFE65100) else Color(0xFF2E7D32)
+                                color = TextPrimary
+                            )
+                            Text(
+                                text = "Upload queued local recordings via WorkManager",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
                             )
                         }
                     }
-                    Text(
-                        text = "Trigger immediate background upload of all pending local research recordings via the WorkManager offline sync pipeline.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+
+                    AdaptIQStatusBadge(
+                        text = "$pendingSyncCount Pending",
+                        status = if (pendingSyncCount > 0) "WARNING" else "SUCCESS"
                     )
-                    Button(
-                        onClick = onTriggerSync,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Synchronize Queued Sessions Now", fontWeight = FontWeight.Bold)
-                    }
                 }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                AdaptIQPrimaryButton(
+                    text = "Synchronize Queued Sessions Now",
+                    onClick = onTriggerSync,
+                    modifier = Modifier.fillMaxWidth(),
+                    height = 46.dp
+                )
             }
 
             // 3. Test Backend Connectivity
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+            AdaptIQSurfaceCard(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "3. Backend Connectivity Diagnostic",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Verify whether this device can currently reach the Adapt-IQ research server and authenticate participant sessions.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    OutlinedButton(
-                        onClick = onTestConnectivity,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp)
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = SurfaceElevatedVariant,
+                        border = BorderStroke(1.dp, BorderSubtle),
+                        modifier = Modifier.size(40.dp)
                     ) {
-                        Text("Check Server Connectivity", fontWeight = FontWeight.SemiBold)
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(text = "🌐", fontSize = 18.sp)
+                        }
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "Backend Connectivity Diagnostic",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = "Verify connection to the Adapt-IQ research server",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                AdaptIQSecondaryButton(
+                    text = "Check Server Connectivity",
+                    onClick = onTestConnectivity,
+                    modifier = Modifier.fillMaxWidth(),
+                    height = 46.dp
+                )
             }
 
             // 4. Reset Active Session
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+            AdaptIQSurfaceCard(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "4. New Participant Setup",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = if (isSessionActive) {
-                            "A research session is currently active. Resetting will conclude the active session and prepare for the next participant (consent remains preserved)."
-                        } else {
-                            "No active research session. Starting a new session from Conduct Session will collect fresh demographics."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    OutlinedButton(
-                        onClick = onResetSession,
-                        enabled = isSessionActive,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp)
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = SurfaceElevatedVariant,
+                        border = BorderStroke(1.dp, BorderSubtle),
+                        modifier = Modifier.size(40.dp)
                     ) {
-                        Text("Conclude Current Session for Next Participant", fontWeight = FontWeight.SemiBold)
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(text = "👤", fontSize = 18.sp)
+                        }
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "New Participant Setup",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = if (isSessionActive) {
+                                "Active research session running. Conclude to prepare next participant."
+                            } else {
+                                "No active session. Starting Conduct Session collects fresh demographics."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                AdaptIQOutlinedButton(
+                    text = "Conclude Session for Next Participant",
+                    onClick = onResetSession,
+                    enabled = isSessionActive,
+                    modifier = Modifier.fillMaxWidth(),
+                    borderColor = if (isSessionActive) StatusWarning else BorderSubtle,
+                    textColor = if (isSessionActive) StatusWarning else TextMuted,
+                    height = 46.dp
+                )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-            OutlinedButton(
+            AdaptIQOutlinedButton(
+                text = "Back to Dashboard",
                 onClick = onBack,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("Back to Dashboard", fontWeight = FontWeight.Bold)
-            }
+                modifier = Modifier.fillMaxWidth(),
+                borderColor = BorderSubtle,
+                textColor = TextSecondary
+            )
         }
     }
 }

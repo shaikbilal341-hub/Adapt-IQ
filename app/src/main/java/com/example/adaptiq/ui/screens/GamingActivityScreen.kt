@@ -3,6 +3,7 @@ package com.example.adaptiq.ui.screens
 import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.os.SystemClock
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -16,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -30,7 +32,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.adaptiq.ui.components.PracticeHeader
+import com.example.adaptiq.ui.components.*
+import com.example.adaptiq.ui.theme.*
 import kotlinx.coroutines.delay
 import java.util.Locale
 import kotlin.math.abs
@@ -223,243 +226,305 @@ fun GamingActivityScreen(
         return
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text(
-            text = "Activity 13 of 13: Gaming-style Interaction",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = "Playable 30-second research games measuring motor reflexes, obstacle avoidance, steering stability, and response latency.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        if (gameMode == GamingMode.SELECTION) {
-            Text(
-                text = "Select 30-Second Research Mini-Game",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+    AdaptIQScreenContainer {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp, vertical = 24.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            AdaptIQSectionHeader(
+                title = "Gaming-style Interaction",
+                subtitle = "30-second playable research tasks evaluating motor reflexes, obstacle avoidance, steering stability, and response latency",
+                badgeText = "ACTIVITY 13 OF 13"
             )
 
-            Card(
-                onClick = {
-                    gameMode = GamingMode.RUNNER
-                    onGameModeSelected("runner")
-                    accumulatedActiveMs = 0L
-                    timeRemainingSeconds = 30
-                    isGameRunning = false
-                    isGamePaused = false
-                    isGameFinished = false
-                    isPractice = true
-                    trialResults = null
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("🏃 3D Perspective Runner", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("3-lane 3D perspective runner. Swipe on the gameplay track to dodge roadblocks, jump track hurdles, and slide under overhead arches.")
-                }
-            }
-
-            Card(
-                onClick = {
-                    gameMode = GamingMode.DRIVING
-                    onGameModeSelected("driving")
-                    accumulatedActiveMs = 0L
-                    timeRemainingSeconds = 30
-                    isGameRunning = false
-                    isGamePaused = false
-                    isGameFinished = false
-                    isPractice = true
-                    trialResults = null
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("🏎️ Driving Game (Dr. Driving–Inspired)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Highway driving simulation with oncoming traffic, lane changes, steering stability, acceleration, braking, and lane-deviation tracking.")
-                }
-            }
-
-            OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
-                Text("Back to Dashboard")
-            }
-        } else {
-            val currentModeStr = if (gameMode == GamingMode.RUNNER) "runner" else "driving"
-
-            // Header with Practice / Official Mode Controls
-            PracticeHeader(
-                isPractice = isPractice,
-                onStartOfficialCollection = {
-                    startOfficialTrial(currentModeStr)
-                }
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            if (gameMode == GamingMode.SELECTION) {
                 Text(
-                    text = when (gameMode) {
-                        GamingMode.RUNNER -> "Runner Game"
-                        GamingMode.DRIVING -> "Driving Game"
-                        else -> ""
-                    },
+                    text = "Select 30-Second Research Mini-Game",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = AccentTeal
                 )
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (isGameRunning) {
-                        OutlinedButton(onClick = { handlePauseResume(currentModeStr) }) {
-                            Text(if (isGamePaused) "Resume" else "Pause")
+                AdaptIQSurfaceCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        gameMode = GamingMode.RUNNER
+                        onGameModeSelected("runner")
+                        accumulatedActiveMs = 0L
+                        timeRemainingSeconds = 30
+                        isGameRunning = false
+                        isGamePaused = false
+                        isGameFinished = false
+                        isPractice = true
+                        trialResults = null
+                    }
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = AccentTeal.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, AccentTeal.copy(alpha = 0.4f)),
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("🏃", fontSize = 22.sp)
+                            }
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "3D Perspective Runner",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "3-lane runner. Swipe on the gameplay track to dodge roadblocks, jump track hurdles, and slide under overhead arches.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+                        Text("➔", color = AccentTeal, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+                }
+
+                AdaptIQSurfaceCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        gameMode = GamingMode.DRIVING
+                        onGameModeSelected("driving")
+                        accumulatedActiveMs = 0L
+                        timeRemainingSeconds = 30
+                        isGameRunning = false
+                        isGamePaused = false
+                        isGameFinished = false
+                        isPractice = true
+                        trialResults = null
+                    }
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = AccentBlue.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, AccentBlue.copy(alpha = 0.4f)),
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("🏎️", fontSize = 22.sp)
+                            }
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Dr. Driving Research Simulation",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Highway driving with oncoming traffic, lane changes, continuous steering wheel rotation, acceleration, and braking.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+                        Text("➔", color = AccentBlue, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                AdaptIQOutlinedButton(
+                    text = "Back to Dashboard",
+                    onClick = onBack,
+                    modifier = Modifier.fillMaxWidth(),
+                    borderColor = BorderSubtle,
+                    textColor = TextSecondary
+                )
+            } else {
+                val currentModeStr = if (gameMode == GamingMode.RUNNER) "runner" else "driving"
+
+                // Header with Practice / Official Mode Controls
+                PracticeHeader(
+                    isPractice = isPractice,
+                    onStartOfficialCollection = {
+                        startOfficialTrial(currentModeStr)
+                    }
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = when (gameMode) {
+                            GamingMode.RUNNER -> "Runner Game"
+                            GamingMode.DRIVING -> "Driving Game"
+                            else -> ""
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (isGameRunning) {
+                            AdaptIQOutlinedButton(
+                                text = if (isGamePaused) "Resume" else "Pause",
+                                onClick = { handlePauseResume(currentModeStr) },
+                                height = 36.dp,
+                                borderColor = if (isGamePaused) StatusSuccess else BorderSubtle,
+                                textColor = if (isGamePaused) StatusSuccess else TextPrimary
+                            )
+                        }
+
+                        Surface(
+                            shape = BadgeShape,
+                            color = SurfaceElevatedVariant,
+                            border = BorderStroke(1.dp, if (isPractice) StatusWarning else AccentTeal)
+                        ) {
+                            Text(
+                                text = if (isPractice && !isGameRunning) "PRACTICE" else "⏱️ 00:%02d".format(timeRemainingSeconds),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isPractice) StatusWarning else AccentTeal
+                            )
                         }
                     }
-
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer
-                    ) {
-                        Text(
-                            text = if (isPractice && !isGameRunning) "PRACTICE" else "⏱️ 00:%02d".format(timeRemainingSeconds),
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
                 }
-            }
 
-            if (trialResults == null) {
-                when (gameMode) {
-                    GamingMode.RUNNER -> {
-                        RunnerGameView(
-                            trialAttemptId = currentAttemptId,
-                            isGameRunning = isGameRunning,
-                            isGamePaused = isGamePaused,
-                            isPractice = isPractice,
-                            onStartPractice = {
-                                isGameRunning = true
-                                isGamePaused = false
-                            },
-                            onLogEvent = { exp, det, res, att, dur, touch ->
-                                onLogEvent(exp, det, res, att, dur, touch, "runner")
-                            },
-                            onTrialFinished = { results ->
-                                trialResults = results
-                                if (!isPractice) {
-                                    onLogEvent(
-                                        "complete_trial",
-                                        "completed_30s",
-                                        "successful",
-                                        currentAttemptId,
-                                        30_000L,
-                                        "score=${results.score},avoided=${results.avoidedTotal},collisions=${results.collisionsTotal}",
-                                        "runner"
-                                    )
+                if (trialResults == null) {
+                    when (gameMode) {
+                        GamingMode.RUNNER -> {
+                            RunnerGameView(
+                                trialAttemptId = currentAttemptId,
+                                isGameRunning = isGameRunning,
+                                isGamePaused = isGamePaused,
+                                isPractice = isPractice,
+                                onStartPractice = {
+                                    isGameRunning = true
+                                    isGamePaused = false
+                                },
+                                onLogEvent = { exp, det, res, att, dur, touch ->
+                                    onLogEvent(exp, det, res, att, dur, touch, "runner")
+                                },
+                                onTrialFinished = { results ->
+                                    trialResults = results
+                                    if (!isPractice) {
+                                        onLogEvent(
+                                            "complete_trial",
+                                            "completed_30s",
+                                            "successful",
+                                            currentAttemptId,
+                                            30_000L,
+                                            "score=${results.score},avoided=${results.avoidedTotal},collisions=${results.collisionsTotal}",
+                                            "runner"
+                                        )
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        }
+
+                        else -> {}
                     }
-
-                    else -> {}
                 }
-            }
 
-            // Scored Results Screen
-            if (trialResults != null) {
-                val res = trialResults!!
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                // Scored Results Screen
+                if (trialResults != null) {
+                    val res = trialResults!!
+                    AdaptIQSurfaceCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        containerColor = SurfaceElevatedVariant,
+                        borderColor = StatusSuccess
                     ) {
                         Text(
                             text = "✓ 30-Second Trial Completed",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                            color = StatusSuccess
                         )
                         Text(
                             text = "Status: ${res.completionStatus} • Active Duration: 30.00s",
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary
+                            color = AccentTeal,
+                            style = MaterialTheme.typography.bodySmall
                         )
 
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
+                        HorizontalDivider(color = BorderSubtle, thickness = 1.dp)
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Game Score:", fontWeight = FontWeight.Bold)
-                            Text("${res.score} pts", fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                            Text("Game Score:", fontWeight = FontWeight.Bold, color = TextPrimary)
+                            Text("${res.score} pts", fontWeight = FontWeight.Bold, color = StatusSuccess)
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Encounters Total:")
-                            Text("${res.encountersTotal}")
+                            Text("Encounters Total:", color = TextSecondary)
+                            Text("${res.encountersTotal}", color = TextPrimary)
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Successfully Avoided:")
-                            Text("${res.avoidedTotal}", color = Color(0xFF1565C0))
+                            Text("Successfully Avoided:", color = TextSecondary)
+                            Text("${res.avoidedTotal}", color = AccentBlue)
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Collisions Recorded:")
-                            Text("${res.collisionsTotal}", color = if (res.collisionsTotal > 0) Color(0xFFC62828) else Color(0xFF2E7D32))
+                            Text("Collisions Recorded:", color = TextSecondary)
+                            Text("${res.collisionsTotal}", color = if (res.collisionsTotal > 0) StatusError else StatusSuccess)
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Average Response Latency:")
-                            Text(if (res.averageLatencyMs > 0L) "${res.averageLatencyMs} ms" else "NA")
+                            Text("Average Response Latency:", color = TextSecondary)
+                            Text(if (res.averageLatencyMs > 0L) "${res.averageLatencyMs} ms" else "NA", color = TextPrimary)
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("${res.extraMetricLabel}:")
-                            Text(res.extraMetricValue)
+                            Text("${res.extraMetricLabel}:", color = TextSecondary)
+                            Text(res.extraMetricValue, color = TextPrimary)
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    AdaptIQPrimaryButton(
+                        text = "Complete Activity & Return to Dashboard",
+                        onClick = onActivityCompleted,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    AdaptIQOutlinedButton(
+                        text = "Retry 30-Second Scored Trial",
+                        onClick = {
+                            startOfficialTrial(currentModeStr)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        borderColor = BorderSubtle,
+                        textColor = TextPrimary
+                    )
                 }
 
-                Button(
-                    onClick = onActivityCompleted,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Complete Activity & Return to Dashboard", fontWeight = FontWeight.Bold)
-                }
+                Spacer(modifier = Modifier.height(6.dp))
 
-                OutlinedButton(
+                AdaptIQOutlinedButton(
+                    text = "Select Another Game",
                     onClick = {
-                        startOfficialTrial(currentModeStr)
+                        isGameRunning = false
+                        isGamePaused = false
+                        trialResults = null
+                        accumulatedActiveMs = 0L
+                        timeRemainingSeconds = 30
+                        gameMode = GamingMode.SELECTION
                     },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Retry 30-Second Scored Trial")
-                }
-            }
-
-            OutlinedButton(
-                onClick = {
-                    isGameRunning = false
-                    isGamePaused = false
-                    trialResults = null
-                    accumulatedActiveMs = 0L
-                    timeRemainingSeconds = 30
-                    gameMode = GamingMode.SELECTION
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Select Another Game")
+                    modifier = Modifier.fillMaxWidth(),
+                    borderColor = BorderSubtle,
+                    textColor = TextSecondary
+                )
             }
         }
     }
@@ -727,8 +792,13 @@ private fun RunnerGameView(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(270.dp)
-                .background(if (collisionFlash) Color(0xFF450A0A) else Color(0xFF0F172A), shape = RoundedCornerShape(16.dp))
+                .height(280.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .border(
+                    BorderStroke(1.dp, if (collisionFlash) StatusError else BorderSubtle),
+                    RoundedCornerShape(16.dp)
+                )
+                .background(if (collisionFlash) StatusErrorContainer else Color(0xFF090E1D))
                 .pointerInput(isGameRunning, isGamePaused) {
                     if (isGameRunning && !isGamePaused) {
                         var dragX = 0f
@@ -779,8 +849,32 @@ private fun RunnerGameView(
                 // Horizon & Sky
                 val horizonY = height * 0.35f
                 val bottomY = height
-                drawRect(color = Color(0xFF020617), topLeft = Offset(0f, 0f), size = Size(width, horizonY))
-                drawRect(color = Color(0xFF1E293B), topLeft = Offset(0f, horizonY), size = Size(width, height - horizonY))
+
+                // Midnight Sci-Fi Horizon Sky
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color(0xFF050914), Color(0xFF0B1426)),
+                        startY = 0f,
+                        endY = horizonY
+                    ),
+                    topLeft = Offset(0f, 0f),
+                    size = Size(width, horizonY)
+                )
+
+                // Neon horizon grid line
+                drawLine(
+                    color = AccentTeal.copy(alpha = 0.5f),
+                    start = Offset(0f, horizonY),
+                    end = Offset(width, horizonY),
+                    strokeWidth = 2f
+                )
+
+                // Ground Terrain
+                drawRect(
+                    color = Color(0xFF0D172A),
+                    topLeft = Offset(0f, horizonY),
+                    size = Size(width, height - horizonY)
+                )
 
                 val bottomRoadWidth = width * 0.88f
                 val horizonRoadWidth = width * 0.22f
@@ -790,7 +884,7 @@ private fun RunnerGameView(
                 val leftHorizonX = (width - horizonRoadWidth) / 2f
                 val rightHorizonX = leftHorizonX + horizonRoadWidth
 
-                // Running Track Path
+                // Running Track Surface (Deep Carbon)
                 val trackPath = Path().apply {
                     moveTo(leftHorizonX, horizonY)
                     lineTo(rightHorizonX, horizonY)
@@ -798,31 +892,45 @@ private fun RunnerGameView(
                     lineTo(leftBottomX, bottomY)
                     close()
                 }
-                drawPath(trackPath, Color(0xFF334155))
+                drawPath(trackPath, Color(0xFF131D33))
 
-                // Track forward speed lines
+                // Outer Glowing Road Borders
+                drawLine(
+                    color = AccentTeal.copy(alpha = 0.85f),
+                    start = Offset(leftHorizonX, horizonY),
+                    end = Offset(leftBottomX, bottomY),
+                    strokeWidth = 3f
+                )
+                drawLine(
+                    color = AccentTeal.copy(alpha = 0.85f),
+                    start = Offset(rightHorizonX, horizonY),
+                    end = Offset(rightBottomX, bottomY),
+                    strokeWidth = 3f
+                )
+
+                // Forward Speed Ticks on Track
                 for (i in 0..4) {
                     val lineDepth = (i * 0.22f + roadScrollOffset * 0.22f) % 1.0f
                     val lineY = horizonY + (bottomY - horizonY) * lineDepth
                     val currentW = horizonRoadWidth + (bottomRoadWidth - horizonRoadWidth) * lineDepth
                     val leftX = (width - currentW) / 2f
                     drawLine(
-                        color = Color(0xFF475569).copy(alpha = 0.5f),
+                        color = AccentBlue.copy(alpha = 0.25f + lineDepth * 0.25f),
                         start = Offset(leftX, lineY),
                         end = Offset(leftX + currentW, lineY),
-                        strokeWidth = 2f + lineDepth * 4f
+                        strokeWidth = 1.5f + lineDepth * 3.5f
                     )
                 }
 
-                // 3 Lane Dividers
+                // 3 Lanes Dividers with Glowing Cyan Tints
                 for (laneDiv in 1..2) {
                     val topX = leftHorizonX + (horizonRoadWidth / 3f) * laneDiv
                     val botX = leftBottomX + (bottomRoadWidth / 3f) * laneDiv
                     drawLine(
-                        color = Color(0xFFCBD5E1).copy(alpha = 0.8f),
+                        color = AccentTeal.copy(alpha = 0.5f),
                         start = Offset(topX, horizonY),
                         end = Offset(botX, bottomY),
-                        strokeWidth = 2.5f
+                        strokeWidth = 2f
                     )
                 }
 
@@ -834,145 +942,209 @@ private fun RunnerGameView(
                     val laneW = currentRoadW / 3f
                     val obsCenterX = currentLeftX + laneW * obs.lane + (laneW / 2f)
 
-                    val obsBaseW = laneW * 0.75f
+                    val obsBaseW = laneW * 0.78f
                     val obsBaseH = 28f * (0.3f + obs.depth * 0.7f)
 
                     when (obs.type) {
                         RunnerObstacleType.JUMP_HURDLE -> {
-                            // Red Hurdle
+                            // Glowing Jump Hurdle (Neon Coral Red)
                             drawRoundRect(
-                                color = Color(0xFFEF4444),
+                                color = StatusError,
                                 topLeft = Offset(obsCenterX - obsBaseW / 2f, obsY - obsBaseH / 2f),
-                                size = Size(obsBaseW, obsBaseH * 0.7f),
-                                cornerRadius = CornerRadius(4f, 4f)
+                                size = Size(obsBaseW, obsBaseH * 0.75f),
+                                cornerRadius = CornerRadius(6f, 6f)
                             )
-                            drawCircle(color = Color.White, radius = obsBaseH * 0.2f, center = Offset(obsCenterX, obsY - obsBaseH * 0.1f))
+                            // Bright horizontal energy core
+                            drawLine(
+                                color = Color.White,
+                                start = Offset(obsCenterX - obsBaseW * 0.4f, obsY - obsBaseH * 0.12f),
+                                end = Offset(obsCenterX + obsBaseW * 0.4f, obsY - obsBaseH * 0.12f),
+                                strokeWidth = 3f
+                            )
                         }
                         RunnerObstacleType.SLIDE_ARCH -> {
-                            // Purple Overhead Arch
-                            val archHeight = obsBaseH * 1.6f
+                            // High-Tech Overhead Laser Arch (Neon Amber/Gold)
+                            val archHeight = obsBaseH * 1.65f
                             drawRoundRect(
-                                color = Color(0xFFA855F7),
+                                color = StatusWarning,
                                 topLeft = Offset(obsCenterX - obsBaseW / 2f, obsY - archHeight),
-                                size = Size(obsBaseW, obsBaseH * 0.6f),
-                                cornerRadius = CornerRadius(4f, 4f)
+                                size = Size(obsBaseW, obsBaseH * 0.65f),
+                                cornerRadius = CornerRadius(6f, 6f)
                             )
-                            // Arch supporting side pillars
+                            // Supporting side magnetic pylons
                             drawLine(
-                                color = Color(0xFFA855F7),
+                                color = StatusWarning,
                                 start = Offset(obsCenterX - obsBaseW / 2f, obsY - archHeight),
                                 end = Offset(obsCenterX - obsBaseW / 2f, obsY),
-                                strokeWidth = 3f
+                                strokeWidth = 4f
                             )
                             drawLine(
-                                color = Color(0xFFA855F7),
+                                color = StatusWarning,
                                 start = Offset(obsCenterX + obsBaseW / 2f, obsY - archHeight),
                                 end = Offset(obsCenterX + obsBaseW / 2f, obsY),
-                                strokeWidth = 3f
+                                strokeWidth = 4f
                             )
                         }
                         RunnerObstacleType.DODGE_ROADBLOCK -> {
-                            // Orange Hazard Roadblock
+                            // High-Contrast Cyber Roadblock (Vibrant Orange with hazard stripes)
                             drawRoundRect(
                                 color = Color(0xFFF97316),
-                                topLeft = Offset(obsCenterX - obsBaseW / 2f, obsY - obsBaseH * 0.9f),
-                                size = Size(obsBaseW, obsBaseH * 1.4f),
-                                cornerRadius = CornerRadius(6f, 6f)
+                                topLeft = Offset(obsCenterX - obsBaseW / 2f, obsY - obsBaseH * 0.95f),
+                                size = Size(obsBaseW, obsBaseH * 1.45f),
+                                cornerRadius = CornerRadius(8f, 8f)
+                            )
+                            // Hazard dark stripes
+                            drawRoundRect(
+                                color = Color(0xFF1E293B),
+                                topLeft = Offset(obsCenterX - obsBaseW * 0.35f, obsY - obsBaseH * 0.7f),
+                                size = Size(obsBaseW * 0.7f, obsBaseH * 0.5f),
+                                cornerRadius = CornerRadius(4f, 4f)
                             )
                         }
                     }
                 }
 
-                // Player Runner Avatar
+                // Player Runner Avatar (High-Tech Research Character)
                 val playerLaneW = bottomRoadWidth / 3f
                 val playerCenterX = leftBottomX + playerLaneW * playerLane + (playerLaneW / 2f)
                 val playerBaseY = bottomY - 50f
                 val playerRenderY = if (isJumping) playerBaseY - 60f else playerBaseY
                 val avatarRadius = if (isSliding) 14f else 22f
 
-                // Runner Shadow on ground
+                // Runner Ground Shadow
                 drawCircle(
-                    color = Color.Black.copy(alpha = 0.45f),
-                    radius = if (isJumping) 14f else 20f,
-                    center = Offset(playerCenterX, playerBaseY + 10f)
+                    color = Color.Black.copy(alpha = 0.6f),
+                    radius = if (isJumping) 14f else 22f,
+                    center = Offset(playerCenterX, playerBaseY + 12f)
                 )
 
-                // Runner Torso & Head
+                // Runner Torso & Head (Teal Sci-Fi Suit)
                 drawCircle(
-                    color = if (collisionFlash) Color(0xFFEF4444) else Color(0xFF38BDF8),
+                    color = if (collisionFlash) StatusError else AccentTeal,
                     radius = avatarRadius,
                     center = Offset(playerCenterX, playerRenderY)
                 )
-                // Head accent
+
+                // High-Tech Cyber Visor / Core
                 drawCircle(
                     color = Color.White,
                     radius = avatarRadius * 0.45f,
-                    center = Offset(playerCenterX, playerRenderY - avatarRadius * 0.3f)
+                    center = Offset(playerCenterX, playerRenderY - avatarRadius * 0.25f)
                 )
             }
 
-            // Top Status Overlay
-            Column(
+            // Minimalist Floating Glass HUD Pill (Top Center)
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = BackgroundDark.copy(alpha = 0.88f),
+                border = BorderStroke(1.dp, BorderSubtle),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .padding(10.dp)
             ) {
-                Text(text = statusText, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, textAlign = TextAlign.Center)
-                Text(
-                    text = "Score: $score • Avoided: $obstaclesAvoided • Collisions: $collisionsCount",
-                    color = Color(0xFF4ADE80),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp
-                )
+                Column(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = statusText,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Score: $score",
+                            color = StatusSuccess,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                        Text(
+                            text = "•",
+                            color = TextMuted,
+                            fontSize = 10.sp
+                        )
+                        Text(
+                            text = "Avoided: $obstaclesAvoided",
+                            color = AccentBlue,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                        Text(
+                            text = "•",
+                            color = TextMuted,
+                            fontSize = 10.sp
+                        )
+                        Text(
+                            text = "Collisions: $collisionsCount",
+                            color = if (collisionsCount > 0) StatusError else StatusSuccess,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
             }
 
+            // In-Canvas Frosted Pause Overlay
             if (isGamePaused) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = Color.Black.copy(alpha = 0.75f),
+                    color = BackgroundDark.copy(alpha = 0.90f),
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "⏸️ GAME PAUSED\nActive trial countdown is frozen.\nTap 'Resume' to continue gameplay.",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            textAlign = TextAlign.Center
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.padding(24.dp)
+                        ) {
+                            Text(
+                                text = "⏸️ TRIAL PAUSED",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                text = "Active trial countdown is frozen.\nTap 'Resume' in header to continue gameplay.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
             }
         }
 
         // Gesture Guide HUD (Pure Touch Swipe Controls: No On-Screen Movement Buttons)
-        Surface(
+        AdaptIQSurfaceCard(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = SurfaceElevatedVariant,
+            borderColor = BorderSubtle
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceAround,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("◀ Swipe Left", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                Text("Swipe Right ▶", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                Text("▲ Swipe Up: Jump", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFEF4444))
-                Text("▼ Swipe Down: Slide", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFA855F7))
+                Text("◀ Left", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                Text("Right ▶", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                Text("▲ Jump", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = StatusError)
+                Text("▼ Slide", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = StatusWarning)
             }
         }
 
         if (isPractice && !isGameRunning) {
-            Button(
+            AdaptIQPrimaryButton(
+                text = "Start Practice Run",
                 onClick = onStartPractice,
                 modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Start Practice Run", fontWeight = FontWeight.Bold)
-            }
+            )
         }
     }
 }
@@ -1727,9 +1899,9 @@ private fun LandscapeDrivingGameView(
                         size = Size((rOuter - rimStroke / 2f) * 2f, (rOuter - rimStroke / 2f) * 2f)
                     )
 
-                    // Racing red center alignment strip at 12 o'clock
+                    // Racing teal center alignment strip at 12 o'clock
                     drawArc(
-                        color = Color(0xFFEF4444),
+                        color = AccentTeal,
                         startAngle = 262f,
                         sweepAngle = 16f,
                         useCenter = false,
@@ -1774,7 +1946,7 @@ private fun LandscapeDrivingGameView(
                     )
                     // Hub horn emblem
                     drawCircle(
-                        color = Color(0xFF38BDF8),
+                        color = AccentTeal,
                         radius = hubRadius * 0.40f,
                         center = Offset(cx, cy)
                     )
@@ -1796,12 +1968,12 @@ private fun LandscapeDrivingGameView(
                     .width(66.dp)
                     .height(82.dp)
                     .background(
-                        color = if (isBraking) Color(0xFFDC2626) else Color(0xFF7F1D1D),
+                        color = if (isBraking) StatusError else Color(0xFF7F1D1D),
                         shape = RoundedCornerShape(10.dp)
                     )
                     .border(
                         width = 2.dp,
-                        color = if (isBraking) Color(0xFFFCA5A5) else Color(0xFFEF4444),
+                        color = if (isBraking) Color(0xFFFCA5A5) else StatusError,
                         shape = RoundedCornerShape(10.dp)
                     )
                     .pointerInput(isGameRunning) {
@@ -1842,12 +2014,12 @@ private fun LandscapeDrivingGameView(
                     .width(58.dp)
                     .height(112.dp)
                     .background(
-                        color = if (isAccelerating) Color(0xFF16A34A) else Color(0xFF14532D),
+                        color = if (isAccelerating) StatusSuccess else Color(0xFF14532D),
                         shape = RoundedCornerShape(10.dp)
                     )
                     .border(
                         width = 2.dp,
-                        color = if (isAccelerating) Color(0xFF86EFAC) else Color(0xFF22C55E),
+                        color = if (isAccelerating) Color(0xFF86EFAC) else StatusSuccess,
                         shape = RoundedCornerShape(10.dp)
                     )
                     .pointerInput(isGameRunning) {
@@ -1885,15 +2057,16 @@ private fun LandscapeDrivingGameView(
 
         // Overlay: Practice Start & Official Trial Launch Card
         if (isPractice && !isGameRunning && trialResults == null) {
-            Card(
+            AdaptIQSurfaceCard(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .width(420.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A).copy(alpha = 0.95f))
+                containerColor = SurfaceElevatedVariant,
+                borderColor = BorderSubtle
             ) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -1901,32 +2074,33 @@ private fun LandscapeDrivingGameView(
                         text = "🏎️ Dr. Driving Research Simulation",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = TextPrimary
                     )
                     Text(
                         text = "• Drag the steering wheel (lower-left) to steer continuously.\n• Hold GAS to accelerate and BRAKE to slow down.\n• Avoid oncoming traffic across the 3 perspective lanes.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF94A3B8)
+                        color = TextSecondary
                     )
+
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        OutlinedButton(
+                        AdaptIQOutlinedButton(
+                            text = "Practice Drive",
                             onClick = onStartPractice,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Practice Drive", color = Color.White, fontWeight = FontWeight.Bold)
-                        }
-
-                        Button(
-                            onClick = onStartOfficialTrial,
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB))
-                        ) {
-                            Text("Start Official 30s", fontWeight = FontWeight.Bold)
-                        }
+                            borderColor = BorderSubtle,
+                            textColor = TextPrimary
+                        )
+
+                        AdaptIQPrimaryButton(
+                            text = "Start Official 30s",
+                            onClick = onStartOfficialTrial,
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
             }
@@ -1934,15 +2108,16 @@ private fun LandscapeDrivingGameView(
 
         // Overlay: Pause Dialog
         if (isGamePaused) {
-            Card(
+            AdaptIQSurfaceCard(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .width(360.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B).copy(alpha = 0.96f))
+                containerColor = SurfaceElevatedVariant,
+                borderColor = BorderSubtle
             ) {
                 Column(
-                    modifier = Modifier.padding(24.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -1950,21 +2125,19 @@ private fun LandscapeDrivingGameView(
                         text = "⏸️ GAME PAUSED",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = TextPrimary
                     )
                     Text(
                         text = "Active trial countdown is frozen.\nTap 'Resume' to continue gameplay.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF94A3B8),
+                        color = TextSecondary,
                         textAlign = TextAlign.Center
                     )
-                    Button(
+                    AdaptIQPrimaryButton(
+                        text = "Resume Gameplay",
                         onClick = onPauseResume,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A))
-                    ) {
-                        Text("Resume Gameplay", fontWeight = FontWeight.Bold)
-                    }
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }
@@ -1972,73 +2145,73 @@ private fun LandscapeDrivingGameView(
         // Overlay: Scored Trial Completed Results Dialog
         if (trialResults != null) {
             val res = trialResults
-            Card(
+            AdaptIQSurfaceCard(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .width(460.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A).copy(alpha = 0.98f))
+                containerColor = SurfaceElevatedVariant,
+                borderColor = StatusSuccess
             ) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
                         text = "✓ 30-Second Trial Completed",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = StatusSuccess
                     )
                     Text(
                         text = "Status: ${res.completionStatus} • Active Duration: 30.00s",
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF38BDF8),
+                        color = AccentTeal,
                         fontSize = 12.sp
                     )
 
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = Color(0xFF334155))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = BorderSubtle)
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Game Score:", color = Color.White, fontWeight = FontWeight.Bold)
-                        Text("${res.score} pts", fontWeight = FontWeight.Bold, color = Color(0xFF4ADE80))
+                        Text("Game Score:", color = TextPrimary, fontWeight = FontWeight.Bold)
+                        Text("${res.score} pts", fontWeight = FontWeight.Bold, color = StatusSuccess)
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Traffic Avoided / Total:", color = Color.White)
-                        Text("${res.avoidedTotal} / ${res.encountersTotal}", color = Color(0xFF38BDF8))
+                        Text("Traffic Avoided / Total:", color = TextSecondary)
+                        Text("${res.avoidedTotal} / ${res.encountersTotal}", color = AccentBlue)
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Collisions Recorded:", color = Color.White)
-                        Text("${res.collisionsTotal}", color = if (res.collisionsTotal > 0) Color(0xFFF87171) else Color(0xFF4ADE80))
+                        Text("Collisions Recorded:", color = TextSecondary)
+                        Text("${res.collisionsTotal}", color = if (res.collisionsTotal > 0) StatusError else StatusSuccess)
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Steering & Pedal Actions:", color = Color.White)
-                        Text("${res.actionsCount}", color = Color.White)
+                        Text("Steering & Pedal Actions:", color = TextSecondary)
+                        Text("${res.actionsCount}", color = TextPrimary)
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Average Reaction Latency:", color = Color.White)
-                        Text(if (res.averageLatencyMs > 0L) "${res.averageLatencyMs} ms" else "NA", color = Color.White)
+                        Text("Average Reaction Latency:", color = TextSecondary)
+                        Text(if (res.averageLatencyMs > 0L) "${res.averageLatencyMs} ms" else "NA", color = TextPrimary)
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Distance Traveled:", color = Color.White)
-                        Text(res.extraMetricValue, color = Color.White)
+                        Text("Distance Traveled:", color = TextSecondary)
+                        Text(res.extraMetricValue, color = TextPrimary)
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    Button(
+                    AdaptIQPrimaryButton(
+                        text = "Complete Activity & Return to Dashboard",
                         onClick = onActivityCompleted,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A))
-                    ) {
-                        Text("Complete Activity & Return to Dashboard", fontWeight = FontWeight.Bold)
-                    }
-
-                    OutlinedButton(
-                        onClick = onStartOfficialTrial,
                         modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Retry 30-Second Scored Trial", color = Color.White)
-                    }
+                    )
+
+                    AdaptIQOutlinedButton(
+                        text = "Retry 30-Second Scored Trial",
+                        onClick = onStartOfficialTrial,
+                        modifier = Modifier.fillMaxWidth(),
+                        borderColor = BorderSubtle,
+                        textColor = TextPrimary
+                    )
                 }
             }
         }

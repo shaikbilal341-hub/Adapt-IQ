@@ -9,7 +9,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.adaptiq.ui.components.PracticeHeader
+import androidx.compose.ui.unit.sp
+import com.example.adaptiq.ui.components.*
+import com.example.adaptiq.ui.theme.*
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -46,22 +48,10 @@ fun SliderControlActivityScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Text(
-            text = "Activity 9 of 13: Slider Control",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = "Move the slider to match the target value indicated.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+    AdaptIQScreenContainer(scrollable = false) {
+        AdaptIQSectionHeader(
+            title = "Activity 9 of 13: Slider Control",
+            subtitle = "Move the slider to match the target value indicated."
         )
 
         PracticeHeader(
@@ -75,32 +65,45 @@ fun SliderControlActivityScreen(
         )
 
         if (!isCompleted) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(text = "Trial $currentTrial of $totalTrials", fontWeight = FontWeight.Bold)
-                Text(text = "Target Value: ${currentTarget.toInt()}")
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Trial $currentTrial of $totalTrials",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = "Target: ${currentTarget.toInt()}",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = AccentTeal
+                    )
+                }
+
+                AdaptIQProgressIndicator(
+                    progress = currentTrial.toFloat() / totalTrials.toFloat()
+                )
             }
 
-            LinearProgressIndicator(
-                progress = { currentTrial.toFloat() / totalTrials.toFloat() },
-                modifier = Modifier.fillMaxWidth().height(8.dp)
-            )
-
-            Card(
+            AdaptIQSurfaceCard(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                containerColor = SurfaceElevatedVariant,
+                borderColor = BorderSubtle
             ) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
+                    modifier = Modifier.padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
                         text = "Current Value: ${sliderValue.toInt()}",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = AccentTeal
                     )
 
                     Slider(
@@ -108,10 +111,16 @@ fun SliderControlActivityScreen(
                         onValueChange = { sliderValue = it },
                         valueRange = 0f..100f,
                         steps = 100,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = SliderDefaults.colors(
+                            thumbColor = AccentTeal,
+                            activeTrackColor = AccentTeal,
+                            inactiveTrackColor = BorderSubtle
+                        )
                     )
 
-                    Button(
+                    AdaptIQPrimaryButton(
+                        text = "Confirm Value",
                         onClick = {
                             val duration = if (trialStartTime > 0) System.currentTimeMillis() - trialStartTime else 0L
                             val error = abs(sliderValue - currentTarget)
@@ -140,55 +149,55 @@ fun SliderControlActivityScreen(
                                     isCompleted = true
                                 }
                             }
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Confirm Value", fontWeight = FontWeight.Bold)
-                    }
+                        }
+                    )
                 }
             }
 
             if (feedbackText.isNotBlank()) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    modifier = Modifier.fillMaxWidth()
+                AdaptIQSurfaceCard(
+                    borderColor = if (feedbackText.startsWith("✓")) StatusSuccess.copy(alpha = 0.5f) else StatusWarning.copy(alpha = 0.5f),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
                 ) {
                     Text(
                         text = feedbackText,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        color = if (feedbackText.startsWith("✓")) StatusSuccess else StatusWarning,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(10.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Center
                     )
                 }
             }
         } else {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer
+            AdaptIQSurfaceCard(
+                borderColor = StatusSuccess.copy(alpha = 0.5f)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("✓ Slider Control Completed!", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("All $totalTrials slider control trials completed successfully.")
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "✓ Slider Control Completed!",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = StatusSuccess
+                    )
+                    Text(
+                        text = "All $totalTrials slider control trials completed successfully.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
                 }
             }
 
-            Button(
-                onClick = onActivityCompleted,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Continue to Next Activity", fontWeight = FontWeight.Bold)
-            }
+            Spacer(modifier = Modifier.weight(1f))
+
+            AdaptIQPrimaryButton(
+                text = "Continue to Next Activity",
+                onClick = onActivityCompleted
+            )
         }
 
-        OutlinedButton(
-            onClick = onBack,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Back")
-        }
+        AdaptIQOutlinedButton(
+            text = "Back",
+            onClick = onBack
+        )
     }
 }

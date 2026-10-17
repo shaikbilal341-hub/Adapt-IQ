@@ -18,8 +18,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.adaptiq.ui.components.PracticeHeader
-import com.example.adaptiq.ui.components.VisualDemonstration
+import com.example.adaptiq.ui.components.*
+import com.example.adaptiq.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 
@@ -112,23 +112,10 @@ fun GestureActivityScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text(
-            text = "Activity 5 of 13: Swipe / Gesture",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = "Perform each guided gesture inside the touch area below.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+    AdaptIQScreenContainer(scrollable = true) {
+        AdaptIQSectionHeader(
+            title = "Activity 5 of 13: Swipe / Gesture",
+            subtitle = "Perform each guided gesture inside the touch area below."
         )
 
         PracticeHeader(
@@ -146,7 +133,7 @@ fun GestureActivityScreen(
         if (!isAllCompleted && currentTask != null) {
             // Task Progress
             val progress = ((currentStepIndex + 1).toFloat() / gestureTasks.size.toFloat())
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -154,42 +141,37 @@ fun GestureActivityScreen(
                     Text(
                         text = "Gesture ${currentStepIndex + 1} of ${gestureTasks.size}",
                         style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
                     )
                     Text(
                         text = "${(progress * 100).toInt()}%",
-                        style = MaterialTheme.typography.labelLarge
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = AccentTeal
                     )
                 }
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                AdaptIQProgressIndicator(
+                    progress = progress
                 )
             }
 
             // Task Instructions
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                )
+            AdaptIQSurfaceCard(
+                containerColor = SurfaceElevatedVariant,
+                borderColor = AccentBlue.copy(alpha = 0.3f)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = currentTask.title,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                        color = AccentTeal
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = currentTask.instruction,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                        color = TextSecondary
                     )
                 }
             }
@@ -210,7 +192,7 @@ fun GestureActivityScreen(
                     .fillMaxWidth()
                     .height(200.dp)
                     .background(
-                        color = if (isSuccess) Color(0xFFC8E6C9) else MaterialTheme.colorScheme.primaryContainer,
+                        color = if (isSuccess) StatusSuccess.copy(alpha = 0.2f) else SurfaceElevatedVariant,
                         shape = RoundedCornerShape(16.dp)
                     )
                     .pointerInput(currentStepIndex) {
@@ -272,16 +254,16 @@ fun GestureActivityScreen(
                     modifier = Modifier.padding(16.dp)
                 ) {
                     Text(
-                        text = "PERFORM ACTION HERE",
+                        text = if (isSuccess) "✓ SUCCESS" else "PERFORM ACTION HERE",
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = if (isSuccess) StatusSuccess else TextPrimary,
                         textAlign = TextAlign.Center
                     )
                     Text(
                         text = if (currentTask.actionLabel == "double_tap") "Double tap rapidly inside this box" else "Swipe in the indicated direction inside this box",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                        color = TextSecondary,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -289,17 +271,16 @@ fun GestureActivityScreen(
 
             // Feedback Banner
             feedbackMessage?.let { msg ->
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (isSuccess) Color(0xFF2E7D32) else MaterialTheme.colorScheme.error
+                AdaptIQSurfaceCard(
+                    borderColor = if (isSuccess) StatusSuccess.copy(alpha = 0.5f) else StatusError.copy(alpha = 0.5f),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
                 ) {
                     Text(
                         text = msg,
-                        color = Color.White,
+                        color = if (isSuccess) StatusSuccess else StatusError,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Center
                     )
                 }
@@ -307,39 +288,34 @@ fun GestureActivityScreen(
         }
 
         if (isAllCompleted) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer
+            AdaptIQSurfaceCard(
+                borderColor = StatusSuccess.copy(alpha = 0.5f)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = "✓ All Gestures Completed!",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                        color = StatusSuccess
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "You have completed all 5 required gestures.",
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
                     )
                 }
             }
 
-            Button(
-                onClick = onActivityCompleted,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Continue to Session Dashboard", fontWeight = FontWeight.Bold)
-            }
+            AdaptIQPrimaryButton(
+                text = "Continue to Session Dashboard",
+                onClick = onActivityCompleted
+            )
         }
 
-        OutlinedButton(
-            onClick = onBack,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Back")
-        }
+        AdaptIQOutlinedButton(
+            text = "Back",
+            onClick = onBack
+        )
     }
 }

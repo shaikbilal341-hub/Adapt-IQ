@@ -18,7 +18,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.adaptiq.ui.components.PracticeHeader
+import com.example.adaptiq.ui.components.*
+import com.example.adaptiq.ui.theme.*
 import kotlinx.coroutines.delay
 import java.util.Locale
 import kotlin.math.abs
@@ -118,22 +119,10 @@ fun HoldingThePhoneActivityScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text(
-            text = "Activity 1 of 13: Holding the Phone",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = "Hold your phone steady in a natural sitting position to calibrate baseline posture and sensor stability.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+    AdaptIQScreenContainer(scrollable = false) {
+        AdaptIQSectionHeader(
+            title = "Activity 1 of 13: Holding the Phone",
+            subtitle = "Hold your phone steady in a natural sitting position to calibrate baseline posture and sensor stability."
         )
 
         PracticeHeader(
@@ -147,16 +136,16 @@ fun HoldingThePhoneActivityScreen(
         )
 
         if (!isCompleted) {
-            Card(
+            AdaptIQSurfaceCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                containerColor = SurfaceElevatedVariant
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(24.dp),
+                        .padding(16.dp),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -164,9 +153,9 @@ fun HoldingThePhoneActivityScreen(
                         text = if (isRunning) "⏱️ 00:%02d".format(secondsRemaining) else if (isPractice) "Practice Mode" else "Ready",
                         style = MaterialTheme.typography.displayMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = AccentTeal
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     Text(
                         text = if (isRunning) {
@@ -176,97 +165,99 @@ fun HoldingThePhoneActivityScreen(
                         } else {
                             "Tap 'Start Official Collection' above to begin baseline recording."
                         },
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary,
                         textAlign = TextAlign.Center
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Live Stability Gauge
-                    Column(
+                    // Live Stability Gauge Card
+                    AdaptIQSurfaceCard(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        containerColor = SurfaceElevated,
+                        borderColor = BorderSubtle
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(
-                                text = "Device Stability",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Device Stability",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
+                                Text(
+                                    text = "%.1f%%".format(currentStabilityPct),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (currentStabilityPct > 85f) StatusSuccess else StatusWarning
+                                )
+                            }
+
+                            AdaptIQProgressIndicator(
+                                progress = (currentStabilityPct / 100f).coerceIn(0f, 1f),
+                                color = if (currentStabilityPct > 85f) StatusSuccess else StatusWarning,
+                                height = 10.dp
                             )
+
                             Text(
-                                text = "%.1f%%".format(currentStabilityPct),
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = if (currentStabilityPct > 85f) Color(0xFF2E7D32) else Color(0xFFE65100)
+                                text = if (currentStabilityPct > 88f) "🟢 Steady Hold" else "🟡 Motion Detected",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = TextSecondary
                             )
                         }
-
-                        LinearProgressIndicator(
-                            progress = { currentStabilityPct / 100f },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(12.dp),
-                            color = if (currentStabilityPct > 85f) Color(0xFF4CAF50) else Color(0xFFFF9800),
-                            trackColor = MaterialTheme.colorScheme.surface
-                        )
-
-                        Text(
-                            text = if (currentStabilityPct > 88f) "🟢 Steady Hold" else "🟡 Motion Detected",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                 }
             }
 
             if (!isRunning && isPractice) {
-                Button(
+                AdaptIQSecondaryButton(
+                    text = "Start Practice Hold Timer (15s)",
                     onClick = {
                         secondsRemaining = trialDurationSeconds
                         isRunning = true
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Start Practice Hold Timer (15s)", fontWeight = FontWeight.Bold)
-                }
+                    }
+                )
             }
         } else {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer
+            AdaptIQSurfaceCard(
+                borderColor = StatusSuccess.copy(alpha = 0.5f)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = "✓ Holding the Phone Completed!",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                        color = StatusSuccess
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
                     val finalStability = if (stabilitySamplesCount > 0) stabilitySum / stabilitySamplesCount else currentStabilityPct
-                    Text("Baseline posture and sensor stability recorded successfully (Mean stability: %.1f%%).".format(finalStability))
+                    Text(
+                        text = "Baseline posture and sensor stability recorded successfully (Mean stability: %.1f%%).".format(finalStability),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
                 }
             }
 
-            Button(
-                onClick = onActivityCompleted,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Continue to Next Activity", fontWeight = FontWeight.Bold)
-            }
+            Spacer(modifier = Modifier.weight(1f))
+
+            AdaptIQPrimaryButton(
+                text = "Continue to Next Activity",
+                onClick = onActivityCompleted
+            )
         }
 
-        OutlinedButton(
-            onClick = onBack,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Back")
-        }
+        AdaptIQOutlinedButton(
+            text = "Back",
+            onClick = onBack
+        )
     }
 }

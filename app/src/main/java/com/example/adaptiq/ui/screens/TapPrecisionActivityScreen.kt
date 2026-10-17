@@ -1,12 +1,11 @@
 package com.example.adaptiq.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,10 +15,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.adaptiq.ui.components.PracticeHeader
-import kotlinx.coroutines.delay
-import kotlin.random.Random
+import com.example.adaptiq.ui.components.*
+import com.example.adaptiq.ui.theme.*
 
 @Composable
 fun TapPrecisionActivityScreen(
@@ -56,22 +53,10 @@ fun TapPrecisionActivityScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Text(
-            text = "Activity 2 of 13: Tap Precision",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = "Tap the circular targets as they appear on the screen.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+    AdaptIQScreenContainer(scrollable = false) {
+        AdaptIQSectionHeader(
+            title = "Activity 2 of 13: Tap Precision",
+            subtitle = "Tap the circular targets as they appear on the screen."
         )
 
         PracticeHeader(
@@ -85,25 +70,38 @@ fun TapPrecisionActivityScreen(
         )
 
         if (!isCompleted) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(text = "Trial $currentTrial of $totalTrials", fontWeight = FontWeight.Bold)
-                Text(text = "${(currentTrial.toFloat() / totalTrials.toFloat() * 100).toInt()}%")
-            }
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Trial $currentTrial of $totalTrials",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = "${(currentTrial.toFloat() / totalTrials.toFloat() * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = AccentTeal,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
 
-            LinearProgressIndicator(
-                progress = { currentTrial.toFloat() / totalTrials.toFloat() },
-                modifier = Modifier.fillMaxWidth().height(8.dp)
-            )
+                AdaptIQProgressIndicator(
+                    progress = currentTrial.toFloat() / totalTrials.toFloat()
+                )
+            }
 
             // Interactive Target Box Area
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .background(MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(SurfaceElevatedVariant)
+                    .border(1.dp, BorderSubtle, RoundedCornerShape(20.dp))
             ) {
                 Box(
                     modifier = Modifier
@@ -115,7 +113,8 @@ fun TapPrecisionActivityScreen(
                         modifier = Modifier
                             .size(currentSize)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary)
+                            .background(AccentTeal)
+                            .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
                             .clickable {
                                 val duration = if (trialStartTime > 0) System.currentTimeMillis() - trialStartTime else 0L
                                 feedbackText = "✓ Target Hit! (${duration}ms)"
@@ -141,7 +140,7 @@ fun TapPrecisionActivityScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(12.dp)
+                                .size(10.dp)
                                 .clip(CircleShape)
                                 .background(Color.White)
                         )
@@ -150,46 +149,49 @@ fun TapPrecisionActivityScreen(
             }
 
             feedbackText?.let {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = Color(0xFF2E7D32),
-                    modifier = Modifier.fillMaxWidth()
+                AdaptIQSurfaceCard(
+                    borderColor = StatusSuccess.copy(alpha = 0.5f),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
                 ) {
                     Text(
                         text = it,
-                        color = Color.White,
+                        color = StatusSuccess,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(10.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Center
                     )
                 }
             }
         } else {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer
+            AdaptIQSurfaceCard(
+                borderColor = StatusSuccess.copy(alpha = 0.5f)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("✓ Tap Precision Completed!", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("All $totalTrials precision trials recorded successfully.")
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "✓ Tap Precision Completed!",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = StatusSuccess
+                    )
+                    Text(
+                        text = "All $totalTrials precision trials recorded successfully.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
                 }
             }
 
-            Button(
-                onClick = onActivityCompleted,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Continue to Next Activity", fontWeight = FontWeight.Bold)
-            }
+            Spacer(modifier = Modifier.weight(1f))
+
+            AdaptIQPrimaryButton(
+                text = "Continue to Next Activity",
+                onClick = onActivityCompleted
+            )
         }
 
-        OutlinedButton(
-            onClick = onBack,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Back")
-        }
+        AdaptIQOutlinedButton(
+            text = "Back",
+            onClick = onBack
+        )
     }
 }

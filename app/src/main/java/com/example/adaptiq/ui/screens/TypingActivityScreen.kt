@@ -1,10 +1,8 @@
 package com.example.adaptiq.ui.screens
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,7 +15,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.adaptiq.ui.components.PracticeHeader
+import com.example.adaptiq.ui.components.*
+import com.example.adaptiq.ui.theme.*
 
 @Composable
 fun TypingActivityScreen(
@@ -63,23 +62,10 @@ fun TypingActivityScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text(
-            text = "Activity 4 of 13: Typing",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = "Type the sentence shown below exactly as it appears.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+    AdaptIQScreenContainer(scrollable = true) {
+        AdaptIQSectionHeader(
+            title = "Activity 4 of 13: Typing",
+            subtitle = "Type the sentence shown below exactly as it appears."
         )
 
         PracticeHeader(
@@ -93,25 +79,23 @@ fun TypingActivityScreen(
         )
 
         // Target Sentence Box
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            )
+        AdaptIQSurfaceCard(
+            containerColor = SurfaceElevatedVariant,
+            borderColor = AccentBlue.copy(alpha = 0.4f)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
                     text = "TARGET SENTENCE",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    color = AccentBlue,
+                    letterSpacing = 1.sp
                 )
-                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = targetSentence,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = TextPrimary
                 )
             }
         }
@@ -167,52 +151,56 @@ fun TypingActivityScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .focusRequester(focusRequester),
-            label = { Text("Type here...") },
-            placeholder = { Text("Start typing the sentence above...") },
+            label = { Text("Type here...", color = TextSecondary) },
+            placeholder = { Text("Start typing the sentence above...", color = TextSecondary.copy(alpha = 0.6f)) },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Text,
                 imeAction = ImeAction.Done
             ),
             minLines = 3,
             maxLines = 5,
-            enabled = !isCompleted
+            enabled = !isCompleted,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = SurfaceElevatedVariant,
+                unfocusedContainerColor = SurfaceElevated,
+                focusedBorderColor = AccentTeal,
+                unfocusedBorderColor = BorderSubtle,
+                focusedTextColor = TextPrimary,
+                unfocusedTextColor = TextPrimary,
+                cursorColor = AccentTeal
+            ),
+            shape = RoundedCornerShape(12.dp)
         )
 
         // Progress Bar
         val progress = (typedText.length.toFloat() / targetSentence.length.toFloat()).coerceIn(0f, 1f)
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
                     text = "Typing Progress",
-                    style = MaterialTheme.typography.labelLarge
+                    style = MaterialTheme.typography.labelLarge,
+                    color = TextPrimary
                 )
                 Text(
                     text = "${(progress * 100).toInt()}%",
                     style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = AccentTeal
                 )
             }
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            AdaptIQProgressIndicator(
+                progress = progress
             )
         }
 
         if (isCompleted) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer
+            AdaptIQSurfaceCard(
+                borderColor = StatusSuccess.copy(alpha = 0.5f)
             ) {
                 Row(
-                    modifier = Modifier.padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -220,24 +208,20 @@ fun TypingActivityScreen(
                         text = "✓ Typing Completed Successfully!",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                        color = StatusSuccess
                     )
                 }
             }
 
-            Button(
-                onClick = onActivityCompleted,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Continue to Session Dashboard", fontWeight = FontWeight.Bold)
-            }
+            AdaptIQPrimaryButton(
+                text = "Continue to Session Dashboard",
+                onClick = onActivityCompleted
+            )
         }
 
-        OutlinedButton(
-            onClick = onBack,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Back")
-        }
+        AdaptIQOutlinedButton(
+            text = "Back",
+            onClick = onBack
+        )
     }
 }

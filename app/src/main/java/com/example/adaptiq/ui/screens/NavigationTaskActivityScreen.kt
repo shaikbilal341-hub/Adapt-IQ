@@ -1,5 +1,7 @@
 package com.example.adaptiq.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -10,7 +12,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.adaptiq.ui.components.PracticeHeader
+import com.example.adaptiq.ui.components.*
+import com.example.adaptiq.ui.theme.*
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -78,22 +81,10 @@ fun NavigationTaskActivityScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Text(
-            text = "Activity 11 of 13: Navigation Task",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = "Navigate through the simulated app interface to reach the target screen.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+    AdaptIQScreenContainer(scrollable = false) {
+        AdaptIQSectionHeader(
+            title = "Activity 11 of 13: Navigation Task",
+            subtitle = "Navigate through the simulated app interface to reach the target screen."
         )
 
         PracticeHeader(
@@ -108,126 +99,132 @@ fun NavigationTaskActivityScreen(
         )
 
         if (!isCompleted) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(text = "Trial $currentTrial of $totalTrials", fontWeight = FontWeight.Bold)
-                Text(text = "Goal: Open $currentGoal")
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Trial $currentTrial of $totalTrials",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = "Goal: '$currentGoal'",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = AccentTeal
+                    )
+                }
+
+                AdaptIQProgressIndicator(
+                    progress = currentTrial.toFloat() / totalTrials.toFloat()
+                )
             }
 
-            LinearProgressIndicator(
-                progress = { currentTrial.toFloat() / totalTrials.toFloat() },
-                modifier = Modifier.fillMaxWidth().height(8.dp)
-            )
-
-            Card(
+            AdaptIQSurfaceCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                containerColor = SurfaceElevatedVariant,
+                borderColor = BorderSubtle
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(20.dp),
+                        .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Simulated Header Bar
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = MaterialTheme.colorScheme.primary,
-                        shape = RoundedCornerShape(8.dp)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(SurfaceElevated, shape = RoundedCornerShape(10.dp))
+                            .border(1.dp, BorderSubtle, RoundedCornerShape(10.dp))
+                            .padding(12.dp),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Simulated App • Current Screen: $currentScreen",
-                            color = Color.White,
+                            text = "Simulated Interface • Screen: $currentScreen",
+                            color = AccentTeal,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(12.dp),
                             textAlign = TextAlign.Center
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     if (currentScreen == "Home") {
-                        Button(
-                            onClick = { currentScreen = "Settings"; checkNavigation("Settings", currentGoal) },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Open Settings")
-                        }
-                        Button(
-                            onClick = { currentScreen = "Help"; checkNavigation("Help", currentGoal) },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Open Help")
-                        }
-                        Button(
-                            onClick = { currentScreen = "Messages"; checkNavigation("Messages", currentGoal) },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Open Messages")
-                        }
-                        Button(
-                            onClick = { currentScreen = "Profile"; checkNavigation("Profile", currentGoal) },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Open Profile")
-                        }
+                        AdaptIQSecondaryButton(
+                            text = "Open Settings",
+                            onClick = { currentScreen = "Settings"; checkNavigation("Settings", currentGoal) }
+                        )
+                        AdaptIQSecondaryButton(
+                            text = "Open Help",
+                            onClick = { currentScreen = "Help"; checkNavigation("Help", currentGoal) }
+                        )
+                        AdaptIQSecondaryButton(
+                            text = "Open Messages",
+                            onClick = { currentScreen = "Messages"; checkNavigation("Messages", currentGoal) }
+                        )
+                        AdaptIQSecondaryButton(
+                            text = "Open Profile",
+                            onClick = { currentScreen = "Profile"; checkNavigation("Profile", currentGoal) }
+                        )
                     } else {
-                        Button(
-                            onClick = { currentScreen = "Home" },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-                        ) {
-                            Text("← Back to Home")
-                        }
+                        AdaptIQPrimaryButton(
+                            text = "← Back to Home",
+                            onClick = { currentScreen = "Home" }
+                        )
                     }
                 }
             }
 
             if (feedbackText.isNotBlank()) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.fillMaxWidth()
+                AdaptIQSurfaceCard(
+                    borderColor = if (feedbackText.startsWith("✓")) StatusSuccess.copy(alpha = 0.5f) else BorderSubtle,
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
                 ) {
                     Text(
                         text = feedbackText,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = if (feedbackText.startsWith("✓")) StatusSuccess else TextPrimary,
                         fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(10.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Center
                     )
                 }
             }
         } else {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer
+            AdaptIQSurfaceCard(
+                borderColor = StatusSuccess.copy(alpha = 0.5f)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("✓ Navigation Task Completed!", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("All $totalTrials navigation goals achieved successfully.")
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "✓ Navigation Task Completed!",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = StatusSuccess
+                    )
+                    Text(
+                        text = "All $totalTrials navigation goals achieved successfully.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
                 }
             }
 
-            Button(
-                onClick = onActivityCompleted,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Continue to Next Activity", fontWeight = FontWeight.Bold)
-            }
+            Spacer(modifier = Modifier.weight(1f))
+
+            AdaptIQPrimaryButton(
+                text = "Continue to Next Activity",
+                onClick = onActivityCompleted
+            )
         }
 
-        OutlinedButton(
-            onClick = onBack,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Back")
-        }
+        AdaptIQOutlinedButton(
+            text = "Back",
+            onClick = onBack
+        )
     }
 }

@@ -11,6 +11,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -24,6 +25,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.pointerInput
@@ -36,9 +39,7 @@ import com.example.adaptiq.ui.components.*
 import com.example.adaptiq.ui.theme.*
 import kotlinx.coroutines.delay
 import java.util.Locale
-import kotlin.math.abs
-import kotlin.math.atan2
-import kotlin.math.sin
+import kotlin.math.*
 import kotlin.random.Random
 
 enum class GamingMode {
@@ -181,7 +182,52 @@ fun GamingActivityScreen(
         onBack()
     }
 
-    // Phase 3: Landscape-First Dedicated Screen for Driving Game
+    // 1. RUNNER GAME: Dedicated Full-Screen Immersive Arcade View (Portrait)
+    if (gameMode == GamingMode.RUNNER) {
+        PortraitRunnerGameView(
+            trialAttemptId = currentAttemptId,
+            isPractice = isPractice,
+            isGameRunning = isGameRunning,
+            isGamePaused = isGamePaused,
+            timeRemainingSeconds = timeRemainingSeconds,
+            trialResults = trialResults,
+            onStartPractice = {
+                isGameRunning = true
+                isGamePaused = false
+            },
+            onStartOfficialTrial = {
+                startOfficialTrial("runner")
+            },
+            onPauseResume = {
+                handlePauseResume("runner")
+            },
+            onLogEvent = { exp, det, res, att, dur, touch ->
+                onLogEvent(exp, det, res, att, dur, touch, "runner")
+            },
+            onTrialFinished = { results ->
+                trialResults = results
+                if (!isPractice) {
+                    onLogEvent(
+                        "complete_trial",
+                        "completed_30s",
+                        "successful",
+                        currentAttemptId,
+                        30_000L,
+                        "score=${results.score},avoided=${results.avoidedTotal},collisions=${results.collisionsTotal}",
+                        "runner"
+                    )
+                }
+            },
+            onActivityCompleted = onActivityCompleted,
+            onBack = {
+                handleBackNavigation("runner")
+                gameMode = GamingMode.SELECTION
+            }
+        )
+        return
+    }
+
+    // 2. DRIVING GAME: Dedicated Full-Screen Immersive Arcade View (Landscape)
     if (gameMode == GamingMode.DRIVING) {
         LandscapeDrivingGameView(
             trialAttemptId = currentAttemptId,
@@ -226,13 +272,14 @@ fun GamingActivityScreen(
         return
     }
 
+    // 3. SELECTION MENU: Clean, Modern Research Protocol Menu
     AdaptIQScreenContainer {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 20.dp, vertical = 24.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
             AdaptIQSectionHeader(
                 title = "Gaming-style Interaction",
@@ -240,292 +287,144 @@ fun GamingActivityScreen(
                 badgeText = "ACTIVITY 13 OF 13"
             )
 
-            if (gameMode == GamingMode.SELECTION) {
-                Text(
-                    text = "Select 30-Second Research Mini-Game",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = AccentTeal
-                )
+            Text(
+                text = "Select 30-Second Research Mini-Game",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = AccentTeal
+            )
 
-                AdaptIQSurfaceCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        gameMode = GamingMode.RUNNER
-                        onGameModeSelected("runner")
-                        accumulatedActiveMs = 0L
-                        timeRemainingSeconds = 30
-                        isGameRunning = false
-                        isGamePaused = false
-                        isGameFinished = false
-                        isPractice = true
-                        trialResults = null
-                    }
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = AccentTeal.copy(alpha = 0.15f),
-                            border = BorderStroke(1.dp, AccentTeal.copy(alpha = 0.4f)),
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("🏃", fontSize = 22.sp)
-                            }
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "3D Perspective Runner",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "3-lane runner. Swipe on the gameplay track to dodge roadblocks, jump track hurdles, and slide under overhead arches.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = TextSecondary
-                            )
-                        }
-                        Text("➔", color = AccentTeal, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    }
+            // Runner Mini-Game Card
+            AdaptIQSurfaceCard(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    gameMode = GamingMode.RUNNER
+                    onGameModeSelected("runner")
+                    accumulatedActiveMs = 0L
+                    timeRemainingSeconds = 30
+                    isGameRunning = false
+                    isGamePaused = false
+                    isGameFinished = false
+                    isPractice = true
+                    trialResults = null
                 }
-
-                AdaptIQSurfaceCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        gameMode = GamingMode.DRIVING
-                        onGameModeSelected("driving")
-                        accumulatedActiveMs = 0L
-                        timeRemainingSeconds = 30
-                        isGameRunning = false
-                        isGamePaused = false
-                        isGameFinished = false
-                        isPractice = true
-                        trialResults = null
-                    }
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = AccentBlue.copy(alpha = 0.15f),
-                            border = BorderStroke(1.dp, AccentBlue.copy(alpha = 0.4f)),
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("🏎️", fontSize = 22.sp)
-                            }
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Dr. Driving Research Simulation",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "Highway driving with oncoming traffic, lane changes, continuous steering wheel rotation, acceleration, and braking.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = TextSecondary
-                            )
-                        }
-                        Text("➔", color = AccentBlue, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                AdaptIQOutlinedButton(
-                    text = "Back to Dashboard",
-                    onClick = onBack,
-                    modifier = Modifier.fillMaxWidth(),
-                    borderColor = BorderSubtle,
-                    textColor = TextSecondary
-                )
-            } else {
-                val currentModeStr = if (gameMode == GamingMode.RUNNER) "runner" else "driving"
-
-                // Header with Practice / Official Mode Controls
-                PracticeHeader(
-                    isPractice = isPractice,
-                    onStartOfficialCollection = {
-                        startOfficialTrial(currentModeStr)
-                    }
-                )
-
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Text(
-                        text = when (gameMode) {
-                            GamingMode.RUNNER -> "Runner Game"
-                            GamingMode.DRIVING -> "Driving Game"
-                            else -> ""
-                        },
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        if (isGameRunning) {
-                            AdaptIQOutlinedButton(
-                                text = if (isGamePaused) "Resume" else "Pause",
-                                onClick = { handlePauseResume(currentModeStr) },
-                                height = 36.dp,
-                                borderColor = if (isGamePaused) StatusSuccess else BorderSubtle,
-                                textColor = if (isGamePaused) StatusSuccess else TextPrimary
-                            )
-                        }
-
-                        Surface(
-                            shape = BadgeShape,
-                            color = SurfaceElevatedVariant,
-                            border = BorderStroke(1.dp, if (isPractice) StatusWarning else AccentTeal)
-                        ) {
-                            Text(
-                                text = if (isPractice && !isGameRunning) "PRACTICE" else "⏱️ 00:%02d".format(timeRemainingSeconds),
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isPractice) StatusWarning else AccentTeal
-                            )
-                        }
-                    }
-                }
-
-                if (trialResults == null) {
-                    when (gameMode) {
-                        GamingMode.RUNNER -> {
-                            RunnerGameView(
-                                trialAttemptId = currentAttemptId,
-                                isGameRunning = isGameRunning,
-                                isGamePaused = isGamePaused,
-                                isPractice = isPractice,
-                                onStartPractice = {
-                                    isGameRunning = true
-                                    isGamePaused = false
-                                },
-                                onLogEvent = { exp, det, res, att, dur, touch ->
-                                    onLogEvent(exp, det, res, att, dur, touch, "runner")
-                                },
-                                onTrialFinished = { results ->
-                                    trialResults = results
-                                    if (!isPractice) {
-                                        onLogEvent(
-                                            "complete_trial",
-                                            "completed_30s",
-                                            "successful",
-                                            currentAttemptId,
-                                            30_000L,
-                                            "score=${results.score},avoided=${results.avoidedTotal},collisions=${results.collisionsTotal}",
-                                            "runner"
-                                        )
-                                    }
-                                }
-                            )
-                        }
-
-                        else -> {}
-                    }
-                }
-
-                // Scored Results Screen
-                if (trialResults != null) {
-                    val res = trialResults!!
-                    AdaptIQSurfaceCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        containerColor = SurfaceElevatedVariant,
-                        borderColor = StatusSuccess
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = AccentTeal.copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, AccentTeal.copy(alpha = 0.4f)),
+                        modifier = Modifier.size(54.dp)
                     ) {
-                        Text(
-                            text = "✓ 30-Second Trial Completed",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = StatusSuccess
-                        )
-                        Text(
-                            text = "Status: ${res.completionStatus} • Active Duration: 30.00s",
-                            fontWeight = FontWeight.SemiBold,
-                            color = AccentTeal,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-
-                        Spacer(modifier = Modifier.height(10.dp))
-                        HorizontalDivider(color = BorderSubtle, thickness = 1.dp)
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Game Score:", fontWeight = FontWeight.Bold, color = TextPrimary)
-                            Text("${res.score} pts", fontWeight = FontWeight.Bold, color = StatusSuccess)
-                        }
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Encounters Total:", color = TextSecondary)
-                            Text("${res.encountersTotal}", color = TextPrimary)
-                        }
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Successfully Avoided:", color = TextSecondary)
-                            Text("${res.avoidedTotal}", color = AccentBlue)
-                        }
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Collisions Recorded:", color = TextSecondary)
-                            Text("${res.collisionsTotal}", color = if (res.collisionsTotal > 0) StatusError else StatusSuccess)
-                        }
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Average Response Latency:", color = TextSecondary)
-                            Text(if (res.averageLatencyMs > 0L) "${res.averageLatencyMs} ms" else "NA", color = TextPrimary)
-                        }
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("${res.extraMetricLabel}:", color = TextSecondary)
-                            Text(res.extraMetricValue, color = TextPrimary)
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("🏃", fontSize = 26.sp)
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    AdaptIQPrimaryButton(
-                        text = "Complete Activity & Return to Dashboard",
-                        onClick = onActivityCompleted,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    AdaptIQOutlinedButton(
-                        text = "Retry 30-Second Scored Trial",
-                        onClick = {
-                            startOfficialTrial(currentModeStr)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        borderColor = BorderSubtle,
-                        textColor = TextPrimary
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "Cyber Runner 3D",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                            Surface(
+                                shape = BadgeShape,
+                                color = AccentTeal.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    text = "PORTRAIT",
+                                    color = AccentTeal,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Full-screen 3-lane sci-fi runner. Swipe on the track to jump laser hurdles, slide under overhead arch gantries, and dodge heavy barricades.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    }
+                    Text("➔", color = AccentTeal, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                AdaptIQOutlinedButton(
-                    text = "Select Another Game",
-                    onClick = {
-                        isGameRunning = false
-                        isGamePaused = false
-                        trialResults = null
-                        accumulatedActiveMs = 0L
-                        timeRemainingSeconds = 30
-                        gameMode = GamingMode.SELECTION
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    borderColor = BorderSubtle,
-                    textColor = TextSecondary
-                )
             }
+
+            // Driving Mini-Game Card
+            AdaptIQSurfaceCard(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    gameMode = GamingMode.DRIVING
+                    onGameModeSelected("driving")
+                    accumulatedActiveMs = 0L
+                    timeRemainingSeconds = 30
+                    isGameRunning = false
+                    isGamePaused = false
+                    isGameFinished = false
+                    isPractice = true
+                    trialResults = null
+                }
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = AccentBlue.copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, AccentBlue.copy(alpha = 0.4f)),
+                        modifier = Modifier.size(54.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("🏎️", fontSize = 26.sp)
+                        }
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "Dr. Driving Research Lab",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                            Surface(
+                                shape = BadgeShape,
+                                color = AccentBlue.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    text = "HIGHWAY SIM",
+                                    color = AccentBlue,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Highway driving simulation with oncoming traffic, lane changes, continuous steering wheel rotation, acceleration, and braking.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    }
+                    Text("➔", color = AccentBlue, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            AdaptIQOutlinedButton(
+                text = "Back to Dashboard",
+                onClick = onBack,
+                modifier = Modifier.fillMaxWidth(),
+                borderColor = BorderSubtle,
+                textColor = TextSecondary
+            )
         }
     }
 }
@@ -545,21 +444,38 @@ data class RunnerObstacle(
 )
 
 /**
- * 1. RUNNER GAME VIEW (Swipe-Based 3D Perspective Mini-Game)
+ * 1. PORTRAIT RUNNER GAME VIEW
+ * Fully redesigned, immersive, full-screen arcade runner featuring:
+ * - Full-screen viewport utilizing 100% of the display area (no outer scrollview padding or height clamping)
+ * - 3D perspective cyber-track with neon laser guardrails, animated speed lines, and glowing lane dividers
+ * - Fully animated Cyber Runner character with fluid running stride, athletic jump tuck, and crouching slide
+ * - Clearly distinguished 3D obstacles (Laser Hurdles, Overhead Arch Gantries, and Hazard Roadblocks)
+ * - Pure swipe gestures: Up (jump), Down (slide), Left/Right (lane change) with zero movement buttons
+ * - Exact 30-second monotonic active research timing
  */
 @Composable
-private fun RunnerGameView(
+private fun PortraitRunnerGameView(
     trialAttemptId: Int = 1,
+    isPractice: Boolean,
     isGameRunning: Boolean,
     isGamePaused: Boolean = false,
-    isPractice: Boolean,
+    timeRemainingSeconds: Int,
+    trialResults: GamingTrialResults?,
     onStartPractice: () -> Unit,
+    onStartOfficialTrial: () -> Unit,
+    onPauseResume: () -> Unit,
     onLogEvent: (expectedAction: String, detectedAction: String, result: String, attemptId: Int, durationMs: Long, touchInfo: String) -> Unit,
-    onTrialFinished: (GamingTrialResults) -> Unit
+    onTrialFinished: (GamingTrialResults) -> Unit,
+    onActivityCompleted: () -> Unit,
+    onBack: () -> Unit
 ) {
     var playerLane by remember { mutableIntStateOf(1) } // 0=Left, 1=Center, 2=Right
+    var playerDisplayLane by remember { mutableFloatStateOf(1f) } // Smooth lerp between lanes
     var isJumping by remember { mutableStateOf(false) }
+    var jumpProgress by remember { mutableFloatStateOf(0f) }
     var isSliding by remember { mutableStateOf(false) }
+    var slideProgress by remember { mutableFloatStateOf(0f) }
+
     var score by remember { mutableIntStateOf(0) }
     var statusText by remember { mutableStateOf("Swipe on track: ◀ Left • Right ▶ • ▲ Jump • ▼ Slide") }
     var collisionFlash by remember { mutableStateOf(false) }
@@ -577,20 +493,66 @@ private fun RunnerGameView(
     var pendingReactionTime by remember { mutableLongStateOf(0L) }
     var pendingDetectedAction by remember { mutableStateOf<String?>(null) }
     var roadScrollOffset by remember { mutableFloatStateOf(0f) }
+    var runCycle by remember { mutableFloatStateOf(0f) }
 
-    // Runner Game Loop
-    LaunchedEffect(isGameRunning) {
-        var lastSpawnTime = SystemClock.elapsedRealtime()
-        while (isGameRunning) {
-            if (isGamePaused) {
-                delay(100L)
-                continue
+    // Jump Animation Coroutine
+    LaunchedEffect(isJumping) {
+        if (isJumping) {
+            val start = SystemClock.elapsedRealtime()
+            val duration = 520L
+            while (true) {
+                val elapsed = SystemClock.elapsedRealtime() - start
+                val p = (elapsed.toFloat() / duration).coerceIn(0f, 1f)
+                jumpProgress = p
+                if (p >= 1f) break
+                delay(16L)
             }
-            val now = SystemClock.elapsedRealtime()
-            roadScrollOffset = (roadScrollOffset + 0.045f) % 1f
+            isJumping = false
+            jumpProgress = 0f
+        }
+    }
 
-            // Spawn obstacles every ~1.8 seconds
-            if (now - lastSpawnTime > 1800L) {
+    // Slide Animation Coroutine
+    LaunchedEffect(isSliding) {
+        if (isSliding) {
+            val start = SystemClock.elapsedRealtime()
+            val duration = 520L
+            while (true) {
+                val elapsed = SystemClock.elapsedRealtime() - start
+                val p = (elapsed.toFloat() / duration).coerceIn(0f, 1f)
+                slideProgress = p
+                if (p >= 1f) break
+                delay(16L)
+            }
+            isSliding = false
+            slideProgress = 0f
+        }
+    }
+
+    // Collision Flash Reset
+    LaunchedEffect(collisionFlash) {
+        if (collisionFlash) {
+            delay(350L)
+            collisionFlash = false
+        }
+    }
+
+    // Runner 60fps Game Loop
+    LaunchedEffect(isGameRunning, isGamePaused) {
+        var lastSpawnTime = SystemClock.elapsedRealtime()
+
+        while (isGameRunning && !isGamePaused) {
+            val now = SystemClock.elapsedRealtime()
+
+            // Smooth forward road scroll & character run stride
+            roadScrollOffset = (roadScrollOffset + 0.038f) % 1f
+            runCycle = (runCycle + 0.28f) % (2f * Math.PI.toFloat())
+
+            // Smooth lane interpolation for athletic transition
+            playerDisplayLane += (playerLane.toFloat() - playerDisplayLane) * 0.26f
+
+            // Spawn obstacles every ~1.75 seconds
+            if (now - lastSpawnTime > 1750L) {
                 lastSpawnTime = now
                 val spawnLane = Random.nextInt(0, 3)
                 val type = when (Random.nextInt(0, 3)) {
@@ -609,11 +571,11 @@ private fun RunnerGameView(
                 )
             }
 
-            // Move and evaluate obstacles
+            // Advance & evaluate obstacles
             val iterator = obstacles.listIterator()
             while (iterator.hasNext()) {
                 val obs = iterator.next()
-                obs.depth += 0.025f // Advance toward player
+                obs.depth += 0.022f // Smooth forward motion
 
                 // Collision evaluation zone: depth in [0.82, 0.98]
                 if (obs.depth >= 0.82f && !obs.evaluated) {
@@ -643,10 +605,9 @@ private fun RunnerGameView(
                     val latency = if (qualifyingResponseTime > 0L && qualifyingResponseTime >= obs.onsetElapsedRealtime) {
                         (qualifyingResponseTime - obs.onsetElapsedRealtime).coerceIn(40L, 1600L)
                     } else if (matched) {
-                        // Action occurred just in time
                         (now - obs.onsetElapsedRealtime).coerceIn(100L, 1600L)
                     } else {
-                        -1L // No qualifying response before collision
+                        -1L
                     }
 
                     if (latency > 0L) {
@@ -664,13 +625,13 @@ private fun RunnerGameView(
                     val resultStr = if (matched) "successful" else "collision"
                     if (matched) {
                         obstaclesAvoided++
-                        score += 25
-                        statusText = "✓ Avoided (${obs.type.name})!"
+                        score += 30
+                        statusText = "✓ Avoided ${obs.type.name.replace('_', ' ')}!"
                     } else {
                         collisionsCount++
                         score = (score - 10).coerceAtLeast(0)
                         collisionFlash = true
-                        statusText = "💥 Collision with ${obs.type.name}!"
+                        statusText = "💥 Collision with ${obs.type.name.replace('_', ' ')}!"
                     }
 
                     if (!isPractice) {
@@ -691,15 +652,15 @@ private fun RunnerGameView(
                 }
             }
 
-            delay(30L)
+            delay(20L) // ~50 fps update rate
         }
 
-        // On game stopped (when 30s expires), calculate final summary
-        if (!isGameRunning && obstaclesEncountered > 0) {
+        // Emit final results when 30s official trial concludes
+        if (!isGameRunning && timeRemainingSeconds == 0 && obstaclesEncountered > 0 && trialResults == null) {
             val avgLat = if (latencyEventsCount > 0) totalLatencySum / latencyEventsCount else -1L
             onTrialFinished(
                 GamingTrialResults(
-                    gameMode = "Runner (Temple Run–Inspired)",
+                    gameMode = "Runner (3D Perspective)",
                     durationSeconds = 30.0f,
                     score = score,
                     encountersTotal = obstaclesEncountered,
@@ -712,27 +673,6 @@ private fun RunnerGameView(
                     completionStatus = "COMPLETED"
                 )
             )
-        }
-    }
-
-    LaunchedEffect(collisionFlash) {
-        if (collisionFlash) {
-            delay(300)
-            collisionFlash = false
-        }
-    }
-
-    LaunchedEffect(isJumping) {
-        if (isJumping) {
-            delay(500)
-            isJumping = false
-        }
-    }
-
-    LaunchedEffect(isSliding) {
-        if (isSliding) {
-            delay(500)
-            isSliding = false
         }
     }
 
@@ -763,9 +703,9 @@ private fun RunnerGameView(
             pendingDetectedAction = "swipe_left"
             if (playerLane > 0) {
                 playerLane--
-                statusText = "◀ Switched to Lane $playerLane"
+                statusText = "◀ Switched to Lane ${playerLane + 1}"
             } else {
-                statusText = "◀ Already at leftmost lane"
+                statusText = "◀ Already at Leftmost Lane"
             }
         }
     }
@@ -777,373 +717,897 @@ private fun RunnerGameView(
             pendingDetectedAction = "swipe_right"
             if (playerLane < 2) {
                 playerLane++
-                statusText = "Switched to Lane $playerLane ▶"
+                statusText = "Switched to Lane ${playerLane + 1} ▶"
             } else {
-                statusText = "Already at rightmost lane ▶"
+                statusText = "Already at Rightmost Lane ▶"
             }
         }
     }
 
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        // Perspective 3D Runner Canvas Box
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(280.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .border(
-                    BorderStroke(1.dp, if (collisionFlash) StatusError else BorderSubtle),
-                    RoundedCornerShape(16.dp)
-                )
-                .background(if (collisionFlash) StatusErrorContainer else Color(0xFF090E1D))
-                .pointerInput(isGameRunning, isGamePaused) {
-                    if (isGameRunning && !isGamePaused) {
-                        var dragX = 0f
-                        var dragY = 0f
-                        var gestureHandled = false
-                        val swipeThreshold = 40f
+    // FULL SCREEN VIEWPORT (No artificial padding or height clamping!)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF070B18))
+            .pointerInput(isGameRunning, isGamePaused) {
+                if (isGameRunning && !isGamePaused) {
+                    var dragX = 0f
+                    var dragY = 0f
+                    var gestureHandled = false
+                    val swipeThreshold = 40f
 
-                        detectDragGestures(
-                            onDragStart = {
-                                dragX = 0f
-                                dragY = 0f
-                                gestureHandled = false
-                            },
-                            onDragEnd = {
-                                gestureHandled = false
-                            },
-                            onDragCancel = {
-                                gestureHandled = false
-                            },
-                            onDrag = { _, dragAmount ->
-                                if (!gestureHandled) {
-                                    dragX += dragAmount.x
-                                    dragY += dragAmount.y
-                                    val absX = abs(dragX)
-                                    val absY = abs(dragY)
+                    detectDragGestures(
+                        onDragStart = {
+                            dragX = 0f
+                            dragY = 0f
+                            gestureHandled = false
+                        },
+                        onDragEnd = { gestureHandled = false },
+                        onDragCancel = { gestureHandled = false },
+                        onDrag = { _, dragAmount ->
+                            if (!gestureHandled) {
+                                dragX += dragAmount.x
+                                dragY += dragAmount.y
+                                val absX = abs(dragX)
+                                val absY = abs(dragY)
 
-                                    if (absX >= swipeThreshold || absY >= swipeThreshold) {
-                                        // Strict dominant axis checking (>= 1.3x) to reject ambiguous diagonal gestures
-                                        if (absX > absY * 1.3f) {
-                                            gestureHandled = true
-                                            if (dragX > 0f) handleMoveRight() else handleMoveLeft()
-                                        } else if (absY > absX * 1.3f) {
-                                            gestureHandled = true
-                                            if (dragY < 0f) handleJump() else handleSlide()
-                                        }
+                                if (absX >= swipeThreshold || absY >= swipeThreshold) {
+                                    // Dominant axis checking (>1.3x) to reject ambiguous diagonals
+                                    if (absX > absY * 1.3f) {
+                                        gestureHandled = true
+                                        if (dragX > 0f) handleMoveRight() else handleMoveLeft()
+                                    } else if (absY > absX * 1.3f) {
+                                        gestureHandled = true
+                                        if (dragY < 0f) handleJump() else handleSlide()
                                     }
                                 }
                             }
+                        }
+                    )
+                }
+            }
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val width = size.width
+            val height = size.height
+
+            val horizonY = height * 0.22f
+            val bottomY = height
+
+            // 1. SKY GRADIENT (Cyber Midnight to Deep Violet)
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color(0xFF030611), Color(0xFF0F172A), Color(0xFF1E1B4B)),
+                    startY = 0f,
+                    endY = horizonY
+                ),
+                topLeft = Offset(0f, 0f),
+                size = Size(width, horizonY)
+            )
+
+            // Skyline Silhouettes on Horizon
+            val buildingCount = 14
+            for (b in 0 until buildingCount) {
+                val bW = width / buildingCount.toFloat()
+                val bH = 25f + ((b * 19) % 55)
+                drawRect(
+                    color = Color(0xFF0A0F24),
+                    topLeft = Offset(b * bW, horizonY - bH),
+                    size = Size(bW * 0.90f, bH)
+                )
+                // Illuminated Windows
+                drawCircle(
+                    color = if (b % 2 == 0) Color(0xFF38BDF8).copy(alpha = 0.6f) else Color(0xFFFDE047).copy(alpha = 0.5f),
+                    radius = 1.5f,
+                    center = Offset(b * bW + bW * 0.45f, horizonY - bH * 0.6f)
+                )
+            }
+
+            // Neon Horizon Laser Beam
+            drawLine(
+                color = AccentTeal.copy(alpha = 0.85f),
+                start = Offset(0f, horizonY),
+                end = Offset(width, horizonY),
+                strokeWidth = 3f
+            )
+
+            // 2. TERRAIN / FLANKING GROUND
+            drawRect(
+                color = Color(0xFF0A1020),
+                topLeft = Offset(0f, horizonY),
+                size = Size(width, bottomY - horizonY)
+            )
+
+            // Gridlines on flanking terrain
+            for (g in 1..6) {
+                val depth = g * 0.16f
+                val y = horizonY + (bottomY - horizonY) * depth
+                drawLine(
+                    color = Color(0xFF1E293B).copy(alpha = 0.45f),
+                    start = Offset(0f, y),
+                    end = Offset(width, y),
+                    strokeWidth = 1f
+                )
+            }
+
+            // 3. TRACK GEOMETRY (Extremely expansive, filling 94% of bottom width!)
+            val bottomRoadWidth = width * 0.94f
+            val horizonRoadWidth = width * 0.28f
+
+            val leftBottomX = (width - bottomRoadWidth) / 2f
+            val rightBottomX = leftBottomX + bottomRoadWidth
+            val leftHorizonX = (width - horizonRoadWidth) / 2f
+            val rightHorizonX = leftHorizonX + horizonRoadWidth
+
+            // Deep Carbon Asphalt Surface
+            val trackPath = Path().apply {
+                moveTo(leftHorizonX, horizonY)
+                lineTo(rightHorizonX, horizonY)
+                lineTo(rightBottomX, bottomY)
+                lineTo(leftBottomX, bottomY)
+                close()
+            }
+            drawPath(
+                path = trackPath,
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color(0xFF0B1222), Color(0xFF0F172A), Color(0xFF131D33)),
+                    startY = horizonY,
+                    endY = bottomY
+                )
+            )
+
+            // High-Tech Outer Glowing Laser Rails
+            drawLine(
+                color = AccentTeal,
+                start = Offset(leftHorizonX, horizonY),
+                end = Offset(leftBottomX, bottomY),
+                strokeWidth = 5f
+            )
+            drawLine(
+                color = AccentTeal.copy(alpha = 0.4f),
+                start = Offset(leftHorizonX - 4f, horizonY),
+                end = Offset(leftBottomX - 6f, bottomY),
+                strokeWidth = 10f
+            )
+
+            drawLine(
+                color = AccentTeal,
+                start = Offset(rightHorizonX, horizonY),
+                end = Offset(rightBottomX, bottomY),
+                strokeWidth = 5f
+            )
+            drawLine(
+                color = AccentTeal.copy(alpha = 0.4f),
+                start = Offset(rightHorizonX + 4f, horizonY),
+                end = Offset(rightBottomX + 6f, bottomY),
+                strokeWidth = 10f
+            )
+
+            // 4. ANIMATED SPEED CHEVRONS ON TRACK
+            for (i in 0..5) {
+                val lineDepth = (i * 0.18f + roadScrollOffset * 0.18f) % 1.0f
+                val lineY = horizonY + (bottomY - horizonY) * lineDepth
+                val currentW = horizonRoadWidth + (bottomRoadWidth - horizonRoadWidth) * lineDepth
+                val leftX = (width - currentW) / 2f
+
+                drawLine(
+                    color = AccentBlue.copy(alpha = 0.15f + lineDepth * 0.35f),
+                    start = Offset(leftX, lineY),
+                    end = Offset(leftX + currentW, lineY),
+                    strokeWidth = 2f + lineDepth * 5f
+                )
+            }
+
+            // 5. 3 LANES DIVIDERS WITH GLOWING CYAN PULSES
+            for (laneDiv in 1..2) {
+                val topX = leftHorizonX + (horizonRoadWidth / 3f) * laneDiv
+                val botX = leftBottomX + (bottomRoadWidth / 3f) * laneDiv
+
+                // Dashed Animated Lane Lines
+                for (dashIdx in 0..7) {
+                    val depth = (dashIdx * 0.14f + roadScrollOffset * 0.14f) % 1.0f
+                    val dashY = horizonY + (bottomY - horizonY) * depth
+                    val dashX = topX + (botX - topX) * depth
+                    val dashH = 12f + depth * 32f
+                    val dashW = 2.5f + depth * 4.5f
+
+                    drawRoundRect(
+                        color = AccentTeal.copy(alpha = 0.4f + depth * 0.5f),
+                        topLeft = Offset(dashX - dashW / 2f, dashY),
+                        size = Size(dashW, dashH),
+                        cornerRadius = CornerRadius(2f, 2f)
+                    )
+                }
+            }
+
+            // 6. DETAILED 3D-PERSPECTIVE OBSTACLES
+            for (obs in obstacles) {
+                val obsY = horizonY + (bottomY - horizonY) * obs.depth
+                val currentRoadW = horizonRoadWidth + (bottomRoadWidth - horizonRoadWidth) * obs.depth
+                val currentLeftX = (width - currentRoadW) / 2f
+                val laneW = currentRoadW / 3f
+                val obsCenterX = currentLeftX + laneW * obs.lane + (laneW / 2f)
+
+                val obsBaseW = laneW * 0.85f
+                val obsScale = 0.35f + obs.depth * 0.65f
+
+                when (obs.type) {
+                    RunnerObstacleType.JUMP_HURDLE -> {
+                        // High-Tech Laser Hurdle (Dual metallic pylons + horizontal plasma laser barrier)
+                        val hurdleH = 46f * obsScale
+                        val pylonW = 14f * obsScale
+
+                        // Left & Right Metallic Pylons
+                        drawRoundRect(
+                            color = Color(0xFF334155),
+                            topLeft = Offset(obsCenterX - obsBaseW / 2f, obsY - hurdleH),
+                            size = Size(pylonW, hurdleH),
+                            cornerRadius = CornerRadius(3f, 3f)
+                        )
+                        drawRoundRect(
+                            color = Color(0xFF334155),
+                            topLeft = Offset(obsCenterX + obsBaseW / 2f - pylonW, obsY - hurdleH),
+                            size = Size(pylonW, hurdleH),
+                            cornerRadius = CornerRadius(3f, 3f)
+                        )
+
+                        // Red/Orange Hazard Strobes on Pylon Tops
+                        drawCircle(
+                            color = StatusError,
+                            radius = 5f * obsScale,
+                            center = Offset(obsCenterX - obsBaseW / 2f + pylonW / 2f, obsY - hurdleH)
+                        )
+                        drawCircle(
+                            color = StatusError,
+                            radius = 5f * obsScale,
+                            center = Offset(obsCenterX + obsBaseW / 2f - pylonW / 2f, obsY - hurdleH)
+                        )
+
+                        // Horizontal Plasma Energy Beam
+                        val beamY = obsY - hurdleH * 0.55f
+                        val beamThickness = 12f * obsScale
+                        drawRoundRect(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(Color(0xFFEF4444), Color(0xFFF97316), Color(0xFFEF4444))
+                            ),
+                            topLeft = Offset(obsCenterX - obsBaseW / 2f + pylonW * 0.8f, beamY - beamThickness / 2f),
+                            size = Size(obsBaseW - pylonW * 1.6f, beamThickness),
+                            cornerRadius = CornerRadius(4f, 4f)
+                        )
+                        // Brilliant White Core Plasma Wire
+                        drawLine(
+                            color = Color.White,
+                            start = Offset(obsCenterX - obsBaseW * 0.42f, beamY),
+                            end = Offset(obsCenterX + obsBaseW * 0.42f, beamY),
+                            strokeWidth = 3f * obsScale
                         )
                     }
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val width = size.width
-                val height = size.height
 
-                // Horizon & Sky
-                val horizonY = height * 0.35f
-                val bottomY = height
+                    RunnerObstacleType.SLIDE_ARCH -> {
+                        // Heavy Overhead Laser Archway (Must slide under!)
+                        val archTotalH = 110f * obsScale
+                        val legW = 16f * obsScale
+                        val beamH = 34f * obsScale
 
-                // Midnight Sci-Fi Horizon Sky
+                        // Left and right heavy pillars
+                        drawRoundRect(
+                            color = Color(0xFF1E293B),
+                            topLeft = Offset(obsCenterX - obsBaseW / 2f, obsY - archTotalH),
+                            size = Size(legW, archTotalH),
+                            cornerRadius = CornerRadius(4f, 4f)
+                        )
+                        drawRoundRect(
+                            color = Color(0xFF1E293B),
+                            topLeft = Offset(obsCenterX + obsBaseW / 2f - legW, obsY - archTotalH),
+                            size = Size(legW, archTotalH),
+                            cornerRadius = CornerRadius(4f, 4f)
+                        )
+
+                        // Top Overhead Crossbeam with Caution Stripes
+                        drawRoundRect(
+                            color = Color(0xFFCA8A04),
+                            topLeft = Offset(obsCenterX - obsBaseW / 2f, obsY - archTotalH),
+                            size = Size(obsBaseW, beamH),
+                            cornerRadius = CornerRadius(4f, 4f)
+                        )
+                        // Diagonal Caution Markings on Beam
+                        val stripeCount = 5
+                        for (s in 0 until stripeCount) {
+                            val sx = obsCenterX - obsBaseW / 2f + (s * (obsBaseW / stripeCount))
+                            drawLine(
+                                color = Color(0xFF0F172A),
+                                start = Offset(sx, obsY - archTotalH + beamH),
+                                end = Offset(sx + 15f * obsScale, obsY - archTotalH),
+                                strokeWidth = 4f * obsScale
+                            )
+                        }
+
+                        // Low-hanging Amber/Red Laser Grid
+                        val laserY1 = obsY - archTotalH + beamH + 6f
+                        val laserY2 = obsY - archTotalH * 0.45f
+                        drawLine(
+                            color = Color(0xFFEF4444).copy(alpha = 0.85f),
+                            start = Offset(obsCenterX - obsBaseW * 0.42f, laserY1),
+                            end = Offset(obsCenterX + obsBaseW * 0.42f, laserY1),
+                            strokeWidth = 3f * obsScale
+                        )
+                        drawLine(
+                            color = Color(0xFFF59E0B).copy(alpha = 0.85f),
+                            start = Offset(obsCenterX - obsBaseW * 0.42f, laserY2),
+                            end = Offset(obsCenterX + obsBaseW * 0.42f, laserY2),
+                            strokeWidth = 3f * obsScale
+                        )
+                    }
+
+                    RunnerObstacleType.DODGE_ROADBLOCK -> {
+                        // High-Security Ballistic Roadblock (Blocks full lane!)
+                        val barrierH = 75f * obsScale
+                        // Concrete / Carbon Base Block
+                        drawRoundRect(
+                            color = Color(0xFF1E293B),
+                            topLeft = Offset(obsCenterX - obsBaseW / 2f, obsY - barrierH),
+                            size = Size(obsBaseW, barrierH),
+                            cornerRadius = CornerRadius(6f, 6f)
+                        )
+
+                        // Bold Hazard Diagonal Chevrons
+                        drawRoundRect(
+                            color = Color(0xFFEA580C),
+                            topLeft = Offset(obsCenterX - obsBaseW * 0.46f, obsY - barrierH * 0.85f),
+                            size = Size(obsBaseW * 0.92f, barrierH * 0.70f),
+                            cornerRadius = CornerRadius(4f, 4f)
+                        )
+                        for (c in 0..4) {
+                            val cx = obsCenterX - obsBaseW * 0.42f + c * (obsBaseW * 0.20f)
+                            drawLine(
+                                color = Color(0xFF0F172A),
+                                start = Offset(cx, obsY - barrierH * 0.15f),
+                                end = Offset(cx + 18f * obsScale, obsY - barrierH * 0.85f),
+                                strokeWidth = 6f * obsScale
+                            )
+                        }
+
+                        // Twin Flashing Strobe Beacons on Top Corners
+                        drawCircle(color = StatusError, radius = 6f * obsScale, center = Offset(obsCenterX - obsBaseW * 0.42f, obsY - barrierH))
+                        drawCircle(color = Color.White, radius = 2.5f * obsScale, center = Offset(obsCenterX - obsBaseW * 0.42f, obsY - barrierH))
+                        drawCircle(color = StatusError, radius = 6f * obsScale, center = Offset(obsCenterX + obsBaseW * 0.42f, obsY - barrierH))
+                        drawCircle(color = Color.White, radius = 2.5f * obsScale, center = Offset(obsCenterX + obsBaseW * 0.42f, obsY - barrierH))
+                    }
+                }
+            }
+
+            // 7. HIGH-FIDELITY ANIMATED RUNNER CHARACTER
+            val playerLaneW = bottomRoadWidth / 3f
+            val playerCenterX = leftBottomX + playerLaneW * playerDisplayLane + (playerLaneW / 2f)
+            val playerBaseY = bottomY - 100f
+
+            drawRunnerCharacter(
+                scope = this,
+                centerX = playerCenterX,
+                baseY = playerBaseY,
+                isJumping = isJumping,
+                jumpProgress = jumpProgress,
+                isSliding = isSliding,
+                slideProgress = slideProgress,
+                runCycle = runCycle,
+                collisionFlash = collisionFlash
+            )
+
+            // 8. COLLISION IMPACT VIGNETTE
+            if (collisionFlash) {
                 drawRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(Color(0xFF050914), Color(0xFF0B1426)),
-                        startY = 0f,
-                        endY = horizonY
-                    ),
+                    color = Color(0xFFDC2626).copy(alpha = 0.45f),
                     topLeft = Offset(0f, 0f),
-                    size = Size(width, horizonY)
+                    size = Size(width, height)
                 )
-
-                // Neon horizon grid line
-                drawLine(
-                    color = AccentTeal.copy(alpha = 0.5f),
-                    start = Offset(0f, horizonY),
-                    end = Offset(width, horizonY),
-                    strokeWidth = 2f
-                )
-
-                // Ground Terrain
-                drawRect(
-                    color = Color(0xFF0D172A),
-                    topLeft = Offset(0f, horizonY),
-                    size = Size(width, height - horizonY)
-                )
-
-                val bottomRoadWidth = width * 0.88f
-                val horizonRoadWidth = width * 0.22f
-
-                val leftBottomX = (width - bottomRoadWidth) / 2f
-                val rightBottomX = leftBottomX + bottomRoadWidth
-                val leftHorizonX = (width - horizonRoadWidth) / 2f
-                val rightHorizonX = leftHorizonX + horizonRoadWidth
-
-                // Running Track Surface (Deep Carbon)
-                val trackPath = Path().apply {
-                    moveTo(leftHorizonX, horizonY)
-                    lineTo(rightHorizonX, horizonY)
-                    lineTo(rightBottomX, bottomY)
-                    lineTo(leftBottomX, bottomY)
-                    close()
-                }
-                drawPath(trackPath, Color(0xFF131D33))
-
-                // Outer Glowing Road Borders
-                drawLine(
-                    color = AccentTeal.copy(alpha = 0.85f),
-                    start = Offset(leftHorizonX, horizonY),
-                    end = Offset(leftBottomX, bottomY),
-                    strokeWidth = 3f
-                )
-                drawLine(
-                    color = AccentTeal.copy(alpha = 0.85f),
-                    start = Offset(rightHorizonX, horizonY),
-                    end = Offset(rightBottomX, bottomY),
-                    strokeWidth = 3f
-                )
-
-                // Forward Speed Ticks on Track
-                for (i in 0..4) {
-                    val lineDepth = (i * 0.22f + roadScrollOffset * 0.22f) % 1.0f
-                    val lineY = horizonY + (bottomY - horizonY) * lineDepth
-                    val currentW = horizonRoadWidth + (bottomRoadWidth - horizonRoadWidth) * lineDepth
-                    val leftX = (width - currentW) / 2f
-                    drawLine(
-                        color = AccentBlue.copy(alpha = 0.25f + lineDepth * 0.25f),
-                        start = Offset(leftX, lineY),
-                        end = Offset(leftX + currentW, lineY),
-                        strokeWidth = 1.5f + lineDepth * 3.5f
-                    )
-                }
-
-                // 3 Lanes Dividers with Glowing Cyan Tints
-                for (laneDiv in 1..2) {
-                    val topX = leftHorizonX + (horizonRoadWidth / 3f) * laneDiv
-                    val botX = leftBottomX + (bottomRoadWidth / 3f) * laneDiv
-                    drawLine(
-                        color = AccentTeal.copy(alpha = 0.5f),
-                        start = Offset(topX, horizonY),
-                        end = Offset(botX, bottomY),
-                        strokeWidth = 2f
-                    )
-                }
-
-                // Approaching Obstacles
-                for (obs in obstacles) {
-                    val obsY = horizonY + (bottomY - horizonY) * obs.depth
-                    val currentRoadW = horizonRoadWidth + (bottomRoadWidth - horizonRoadWidth) * obs.depth
-                    val currentLeftX = (width - currentRoadW) / 2f
-                    val laneW = currentRoadW / 3f
-                    val obsCenterX = currentLeftX + laneW * obs.lane + (laneW / 2f)
-
-                    val obsBaseW = laneW * 0.78f
-                    val obsBaseH = 28f * (0.3f + obs.depth * 0.7f)
-
-                    when (obs.type) {
-                        RunnerObstacleType.JUMP_HURDLE -> {
-                            // Glowing Jump Hurdle (Neon Coral Red)
-                            drawRoundRect(
-                                color = StatusError,
-                                topLeft = Offset(obsCenterX - obsBaseW / 2f, obsY - obsBaseH / 2f),
-                                size = Size(obsBaseW, obsBaseH * 0.75f),
-                                cornerRadius = CornerRadius(6f, 6f)
-                            )
-                            // Bright horizontal energy core
-                            drawLine(
-                                color = Color.White,
-                                start = Offset(obsCenterX - obsBaseW * 0.4f, obsY - obsBaseH * 0.12f),
-                                end = Offset(obsCenterX + obsBaseW * 0.4f, obsY - obsBaseH * 0.12f),
-                                strokeWidth = 3f
-                            )
-                        }
-                        RunnerObstacleType.SLIDE_ARCH -> {
-                            // High-Tech Overhead Laser Arch (Neon Amber/Gold)
-                            val archHeight = obsBaseH * 1.65f
-                            drawRoundRect(
-                                color = StatusWarning,
-                                topLeft = Offset(obsCenterX - obsBaseW / 2f, obsY - archHeight),
-                                size = Size(obsBaseW, obsBaseH * 0.65f),
-                                cornerRadius = CornerRadius(6f, 6f)
-                            )
-                            // Supporting side magnetic pylons
-                            drawLine(
-                                color = StatusWarning,
-                                start = Offset(obsCenterX - obsBaseW / 2f, obsY - archHeight),
-                                end = Offset(obsCenterX - obsBaseW / 2f, obsY),
-                                strokeWidth = 4f
-                            )
-                            drawLine(
-                                color = StatusWarning,
-                                start = Offset(obsCenterX + obsBaseW / 2f, obsY - archHeight),
-                                end = Offset(obsCenterX + obsBaseW / 2f, obsY),
-                                strokeWidth = 4f
-                            )
-                        }
-                        RunnerObstacleType.DODGE_ROADBLOCK -> {
-                            // High-Contrast Cyber Roadblock (Vibrant Orange with hazard stripes)
-                            drawRoundRect(
-                                color = Color(0xFFF97316),
-                                topLeft = Offset(obsCenterX - obsBaseW / 2f, obsY - obsBaseH * 0.95f),
-                                size = Size(obsBaseW, obsBaseH * 1.45f),
-                                cornerRadius = CornerRadius(8f, 8f)
-                            )
-                            // Hazard dark stripes
-                            drawRoundRect(
-                                color = Color(0xFF1E293B),
-                                topLeft = Offset(obsCenterX - obsBaseW * 0.35f, obsY - obsBaseH * 0.7f),
-                                size = Size(obsBaseW * 0.7f, obsBaseH * 0.5f),
-                                cornerRadius = CornerRadius(4f, 4f)
-                            )
-                        }
-                    }
-                }
-
-                // Player Runner Avatar (High-Tech Research Character)
-                val playerLaneW = bottomRoadWidth / 3f
-                val playerCenterX = leftBottomX + playerLaneW * playerLane + (playerLaneW / 2f)
-                val playerBaseY = bottomY - 50f
-                val playerRenderY = if (isJumping) playerBaseY - 60f else playerBaseY
-                val avatarRadius = if (isSliding) 14f else 22f
-
-                // Runner Ground Shadow
-                drawCircle(
-                    color = Color.Black.copy(alpha = 0.6f),
-                    radius = if (isJumping) 14f else 22f,
-                    center = Offset(playerCenterX, playerBaseY + 12f)
-                )
-
-                // Runner Torso & Head (Teal Sci-Fi Suit)
-                drawCircle(
-                    color = if (collisionFlash) StatusError else AccentTeal,
-                    radius = avatarRadius,
-                    center = Offset(playerCenterX, playerRenderY)
-                )
-
-                // High-Tech Cyber Visor / Core
-                drawCircle(
-                    color = Color.White,
-                    radius = avatarRadius * 0.45f,
-                    center = Offset(playerCenterX, playerRenderY - avatarRadius * 0.25f)
-                )
-            }
-
-            // Minimalist Floating Glass HUD Pill (Top Center)
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = BackgroundDark.copy(alpha = 0.88f),
-                border = BorderStroke(1.dp, BorderSubtle),
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(10.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = statusText,
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp,
-                        textAlign = TextAlign.Center
-                    )
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Score: $score",
-                            color = StatusSuccess,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
-                        )
-                        Text(
-                            text = "•",
-                            color = TextMuted,
-                            fontSize = 10.sp
-                        )
-                        Text(
-                            text = "Avoided: $obstaclesAvoided",
-                            color = AccentBlue,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
-                        )
-                        Text(
-                            text = "•",
-                            color = TextMuted,
-                            fontSize = 10.sp
-                        )
-                        Text(
-                            text = "Collisions: $collisionsCount",
-                            color = if (collisionsCount > 0) StatusError else StatusSuccess,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
-                        )
-                    }
-                }
-            }
-
-            // In-Canvas Frosted Pause Overlay
-            if (isGamePaused) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = BackgroundDark.copy(alpha = 0.90f),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.padding(24.dp)
-                        ) {
-                            Text(
-                                text = "⏸️ TRIAL PAUSED",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary,
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                text = "Active trial countdown is frozen.\nTap 'Resume' in header to continue gameplay.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = TextSecondary,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                }
             }
         }
 
-        // Gesture Guide HUD (Pure Touch Swipe Controls: No On-Screen Movement Buttons)
-        AdaptIQSurfaceCard(
-            modifier = Modifier.fillMaxWidth(),
-            containerColor = SurfaceElevatedVariant,
-            borderColor = BorderSubtle
+        // TOP FLOATING ARCADE HUD
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .align(Alignment.TopCenter),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceAround,
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("◀ Left", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
-                Text("Right ▶", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
-                Text("▲ Jump", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = StatusError)
-                Text("▼ Slide", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = StatusWarning)
+                // Exit Button
+                OutlinedButton(
+                    onClick = onBack,
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = BackgroundDark.copy(alpha = 0.75f)),
+                    border = BorderStroke(1.dp, BorderSubtle),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text("✕ Exit", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+
+                // Practice / Official Badge
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isPractice) Color(0xFFCA8A04) else Color(0xFF0D9488)
+                ) {
+                    Text(
+                        text = if (isPractice) "PRACTICE RUN" else "OFFICIAL 30s TRIAL",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+
+                // Monotonic Countdown Timer
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = SurfaceElevatedVariant,
+                    border = BorderStroke(1.dp, if (isPractice) StatusWarning else AccentTeal)
+                ) {
+                    Text(
+                        text = if (isPractice && !isGameRunning) "PRACTICE" else "⏱️ 00:%02d".format(timeRemainingSeconds),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isPractice) StatusWarning else AccentTeal
+                    )
+                }
+
+                // Pause / Resume Button
+                if (isGameRunning) {
+                    Button(
+                        onClick = onPauseResume,
+                        colors = ButtonDefaults.buttonColors(containerColor = if (isGamePaused) Color(0xFF16A34A) else Color(0xFF334155)),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(if (isGamePaused) "▶ Resume" else "⏸ Pause", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+            }
+
+            // Real-Time Score & Avoidance HUD Pill
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = BackgroundDark.copy(alpha = 0.85f),
+                border = BorderStroke(1.dp, BorderSubtle),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceAround,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Score: $score pts", color = StatusSuccess, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text("Avoided: $obstaclesAvoided", color = AccentBlue, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text("Hits: $collisionsCount", color = if (collisionsCount > 0) StatusError else TextSecondary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+            }
+
+            // Floating Dynamic Gesture Status Pill
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = Color.Black.copy(alpha = 0.65f),
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            ) {
+                Text(
+                    text = statusText,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp),
+                    color = AccentTeal,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
 
-        if (isPractice && !isGameRunning) {
-            AdaptIQPrimaryButton(
-                text = "Start Practice Run",
-                onClick = onStartPractice,
-                modifier = Modifier.fillMaxWidth()
+        // FLOATING PRACTICE LAUNCH OVERLAY
+        if (isPractice && !isGameRunning && trialResults == null) {
+            AdaptIQSurfaceCard(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(24.dp)
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                containerColor = SurfaceElevatedVariant,
+                borderColor = AccentTeal
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "🏃 Cyber Runner 3D",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = "• Swipe ▲ Up to jump over laser hurdles.\n• Swipe ▼ Down to slide under overhead arches.\n• Swipe ◀ Left and Right ▶ to change lanes.\n• Avoid all obstacles to maintain maximum response score.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary,
+                        lineHeight = 20.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        AdaptIQOutlinedButton(
+                            text = "Practice Run",
+                            onClick = onStartPractice,
+                            modifier = Modifier.weight(1f),
+                            borderColor = BorderSubtle,
+                            textColor = TextPrimary
+                        )
+
+                        AdaptIQPrimaryButton(
+                            text = "Start Official 30s",
+                            onClick = onStartOfficialTrial,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+        }
+
+        // FROSTED PAUSE OVERLAY
+        if (isGamePaused) {
+            AdaptIQSurfaceCard(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(24.dp)
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                containerColor = SurfaceElevatedVariant,
+                borderColor = BorderSubtle
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "⏸️ TRIAL PAUSED",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = "The 30-second active research timer is frozen.\nTap 'Resume' to continue the trial.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary,
+                        textAlign = TextAlign.Center
+                    )
+                    AdaptIQPrimaryButton(
+                        text = "Resume Gameplay",
+                        onClick = onPauseResume,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+
+        // TRIAL COMPLETED SCORED RESULTS DIALOG
+        if (trialResults != null) {
+            val res = trialResults
+            AdaptIQSurfaceCard(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(20.dp)
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                containerColor = SurfaceElevatedVariant,
+                borderColor = StatusSuccess
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "✓ 30-Second Trial Completed",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = StatusSuccess
+                    )
+                    Text(
+                        text = "Status: ${res.completionStatus} • Active Duration: 30.00s",
+                        fontWeight = FontWeight.SemiBold,
+                        color = AccentTeal,
+                        fontSize = 12.sp
+                    )
+
+                    HorizontalDivider(color = BorderSubtle, thickness = 1.dp)
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Game Score:", fontWeight = FontWeight.Bold, color = TextPrimary)
+                        Text("${res.score} pts", fontWeight = FontWeight.Bold, color = StatusSuccess)
+                    }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Obstacles Avoided / Total:", color = TextSecondary)
+                        Text("${res.avoidedTotal} / ${res.encountersTotal}", color = AccentBlue, fontWeight = FontWeight.Bold)
+                    }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Collisions Recorded:", color = TextSecondary)
+                        Text("${res.collisionsTotal}", color = if (res.collisionsTotal > 0) StatusError else StatusSuccess, fontWeight = FontWeight.Bold)
+                    }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Average Response Latency:", color = TextSecondary)
+                        Text(if (res.averageLatencyMs > 0L) "${res.averageLatencyMs} ms" else "NA", color = TextPrimary, fontWeight = FontWeight.Bold)
+                    }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Motor Reflex Accuracy:", color = TextSecondary)
+                        Text(res.extraMetricValue, color = TextPrimary, fontWeight = FontWeight.Bold)
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    AdaptIQPrimaryButton(
+                        text = "Complete Activity & Return to Dashboard",
+                        onClick = onActivityCompleted,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    AdaptIQOutlinedButton(
+                        text = "Retry 30-Second Scored Trial",
+                        onClick = onStartOfficialTrial,
+                        modifier = Modifier.fillMaxWidth(),
+                        borderColor = BorderSubtle,
+                        textColor = TextPrimary
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Procedural Articulated 2D Runner Character Drawing
+ * Renders head/visor, athletic torso, chest reactor, swinging arms, and running legs
+ */
+private fun drawRunnerCharacter(
+    scope: DrawScope,
+    centerX: Float,
+    baseY: Float,
+    isJumping: Boolean,
+    jumpProgress: Float,
+    isSliding: Boolean,
+    slideProgress: Float,
+    runCycle: Float,
+    collisionFlash: Boolean
+) {
+    with(scope) {
+        val characterHeight = 110f
+        val characterWidth = 68f
+
+        // Stride dynamics
+        val jumpHeight = if (isJumping) sin(jumpProgress * Math.PI.toFloat()) * 135f else 0f
+        val verticalBob = if (!isJumping && !isSliding) abs(sin(runCycle)) * 7f else 0f
+
+        val currentY = baseY - jumpHeight - verticalBob
+
+        // 1. Dynamic Ground Shadow (Stays on the track even during jump!)
+        val shadowScale = if (isJumping) (1f - (jumpHeight / 160f) * 0.5f).coerceAtLeast(0.4f) else if (isSliding) 1.25f else 1.0f
+        val shadowAlpha = if (isJumping) 0.25f else 0.55f
+
+        drawOval(
+            color = Color.Black.copy(alpha = shadowAlpha),
+            topLeft = Offset(centerX - (characterWidth * 0.55f) * shadowScale, baseY + 10f),
+            size = Size((characterWidth * 1.1f) * shadowScale, 18f * shadowScale)
+        )
+
+        val suitBaseColor = if (collisionFlash) StatusError else Color(0xFF0F172A)
+        val suitAccentColor = if (collisionFlash) Color(0xFFFCA5A5) else AccentTeal
+        val visorGlowColor = if (collisionFlash) Color.White else Color(0xFF38BDF8)
+
+        if (isSliding) {
+            // ==========================================
+            // SLIDE POSE: Low, horizontal aerodynamic slide
+            // ==========================================
+            val slideW = characterWidth * 1.35f
+            val slideH = 34f
+            val slideY = baseY - slideH + 10f
+
+            // Motion friction sparks along pavement
+            for (sp in 0..4) {
+                val spX = centerX - slideW / 2f - sp * 14f
+                val spY = baseY + 8f + (sp % 2) * 4f
+                drawCircle(color = Color(0xFFFDE047), radius = 2.5f, center = Offset(spX, spY))
+            }
+
+            // Torso & legs sliding flat
+            drawRoundRect(
+                brush = Brush.horizontalGradient(listOf(suitAccentColor, suitBaseColor)),
+                topLeft = Offset(centerX - slideW / 2f, slideY),
+                size = Size(slideW, slideH),
+                cornerRadius = CornerRadius(10f, 10f)
+            )
+
+            // Sleek Cyber Helmet tucked low
+            drawRoundRect(
+                color = suitAccentColor,
+                topLeft = Offset(centerX + slideW * 0.18f, slideY + 4f),
+                size = Size(26f, 22f),
+                cornerRadius = CornerRadius(6f, 6f)
+            )
+            // Visor Slit
+            drawLine(
+                color = visorGlowColor,
+                start = Offset(centerX + slideW * 0.28f, slideY + 12f),
+                end = Offset(centerX + slideW * 0.42f, slideY + 12f),
+                strokeWidth = 4f,
+                cap = StrokeCap.Round
+            )
+        } else {
+            // ==========================================
+            // STANDING / RUNNING / JUMPING POSE
+            // ==========================================
+            val legSwing = if (isJumping) 0f else sin(runCycle) * 28f
+            val armSwing = if (isJumping) 0f else -sin(runCycle) * 32f
+
+            // Legs
+            val hipY = currentY - characterHeight * 0.40f
+            val footY = currentY
+
+            if (isJumping) {
+                // Tucked legs during leap
+                val tuckY = currentY - characterHeight * 0.18f
+                // Left leg tucked
+                drawRoundRect(
+                    color = suitBaseColor,
+                    topLeft = Offset(centerX - 24f, hipY),
+                    size = Size(16f, tuckY - hipY),
+                    cornerRadius = CornerRadius(5f, 5f)
+                )
+                drawCircle(color = suitAccentColor, radius = 7f, center = Offset(centerX - 16f, tuckY))
+
+                // Right leg tucked
+                drawRoundRect(
+                    color = suitBaseColor,
+                    topLeft = Offset(centerX + 8f, hipY),
+                    size = Size(16f, tuckY - hipY),
+                    cornerRadius = CornerRadius(5f, 5f)
+                )
+                drawCircle(color = suitAccentColor, radius = 7f, center = Offset(centerX + 16f, tuckY))
+            } else {
+                // Running stride legs
+                val leftFootX = centerX - 16f - (legSwing * 0.45f)
+                val rightFootX = centerX + 16f + (legSwing * 0.45f)
+
+                // Left Leg
+                drawLine(
+                    color = suitBaseColor,
+                    start = Offset(centerX - 12f, hipY),
+                    end = Offset(leftFootX, footY),
+                    strokeWidth = 14f,
+                    cap = StrokeCap.Round
+                )
+                // Left Running Shoe
+                drawRoundRect(
+                    color = suitAccentColor,
+                    topLeft = Offset(leftFootX - 10f, footY - 8f),
+                    size = Size(20f, 10f),
+                    cornerRadius = CornerRadius(3f, 3f)
+                )
+
+                // Right Leg
+                drawLine(
+                    color = suitBaseColor,
+                    start = Offset(centerX + 12f, hipY),
+                    end = Offset(rightFootX, footY),
+                    strokeWidth = 14f,
+                    cap = StrokeCap.Round
+                )
+                // Right Running Shoe
+                drawRoundRect(
+                    color = suitAccentColor,
+                    topLeft = Offset(rightFootX - 10f, footY - 8f),
+                    size = Size(20f, 10f),
+                    cornerRadius = CornerRadius(3f, 3f)
+                )
+            }
+
+            // Torso (V-tapered athletic suit)
+            val torsoTopY = currentY - characterHeight * 0.78f
+            val torsoW = characterWidth * 0.72f
+            val torsoH = hipY - torsoTopY
+
+            drawRoundRect(
+                brush = Brush.verticalGradient(listOf(suitAccentColor, suitBaseColor)),
+                topLeft = Offset(centerX - torsoW / 2f, torsoTopY),
+                size = Size(torsoW, torsoH),
+                cornerRadius = CornerRadius(12f, 12f)
+            )
+
+            // High-Tech Chest Arc Reactor Core (Pulsing Cyan)
+            drawCircle(
+                color = Color.White,
+                radius = 7f,
+                center = Offset(centerX, torsoTopY + torsoH * 0.35f)
+            )
+            drawCircle(
+                color = visorGlowColor.copy(alpha = 0.5f),
+                radius = 12f,
+                center = Offset(centerX, torsoTopY + torsoH * 0.35f)
+            )
+
+            // Shoulder Guards
+            drawCircle(color = suitBaseColor, radius = 9f, center = Offset(centerX - torsoW / 2f + 2f, torsoTopY + 4f))
+            drawCircle(color = suitBaseColor, radius = 9f, center = Offset(centerX + torsoW / 2f - 2f, torsoTopY + 4f))
+
+            // Arms
+            if (isJumping) {
+                // Arms raised up in victory leap
+                drawLine(
+                    color = suitBaseColor,
+                    start = Offset(centerX - torsoW / 2f, torsoTopY + 8f),
+                    end = Offset(centerX - torsoW / 2f - 18f, torsoTopY - 22f),
+                    strokeWidth = 10f,
+                    cap = StrokeCap.Round
+                )
+                drawCircle(color = suitAccentColor, radius = 6f, center = Offset(centerX - torsoW / 2f - 18f, torsoTopY - 22f))
+
+                drawLine(
+                    color = suitBaseColor,
+                    start = Offset(centerX + torsoW / 2f, torsoTopY + 8f),
+                    end = Offset(centerX + torsoW / 2f + 18f, torsoTopY - 22f),
+                    strokeWidth = 10f,
+                    cap = StrokeCap.Round
+                )
+                drawCircle(color = suitAccentColor, radius = 6f, center = Offset(centerX + torsoW / 2f + 18f, torsoTopY - 22f))
+            } else {
+                // Running arm swings
+                val leftHandY = torsoTopY + torsoH * 0.5f + armSwing * 0.5f
+                val rightHandY = torsoTopY + torsoH * 0.5f - armSwing * 0.5f
+
+                drawLine(
+                    color = suitBaseColor,
+                    start = Offset(centerX - torsoW / 2f, torsoTopY + 8f),
+                    end = Offset(centerX - torsoW / 2f - 12f, leftHandY),
+                    strokeWidth = 10f,
+                    cap = StrokeCap.Round
+                )
+                drawCircle(color = suitAccentColor, radius = 5.5f, center = Offset(centerX - torsoW / 2f - 12f, leftHandY))
+
+                drawLine(
+                    color = suitBaseColor,
+                    start = Offset(centerX + torsoW / 2f, torsoTopY + 8f),
+                    end = Offset(centerX + torsoW / 2f + 12f, rightHandY),
+                    strokeWidth = 10f,
+                    cap = StrokeCap.Round
+                )
+                drawCircle(color = suitAccentColor, radius = 5.5f, center = Offset(centerX + torsoW / 2f + 12f, rightHandY))
+            }
+
+            // Cyber Helmet & Head
+            val headRadius = 18f
+            val headCenterY = currentY - characterHeight + headRadius + 2f
+
+            drawCircle(
+                color = suitAccentColor,
+                radius = headRadius,
+                center = Offset(centerX, headCenterY)
+            )
+
+            // Aerodynamic Visor Curved Blade
+            drawRoundRect(
+                color = Color(0xFF0F172A),
+                topLeft = Offset(centerX - headRadius * 0.85f, headCenterY - headRadius * 0.35f),
+                size = Size(headRadius * 1.7f, headRadius * 0.70f),
+                cornerRadius = CornerRadius(5f, 5f)
+            )
+            // Visor Cyan Glow Slit
+            drawLine(
+                color = visorGlowColor,
+                start = Offset(centerX - headRadius * 0.65f, headCenterY),
+                end = Offset(centerX + headRadius * 0.65f, headCenterY),
+                strokeWidth = 3.5f,
+                cap = StrokeCap.Round
             )
         }
     }
@@ -1157,19 +1621,21 @@ data class DrivingTrafficVehicle(
     val lane: Int, // 0=Left, 1=Center, 2=Right
     var depth: Float, // 0.0 (horizon) to 1.0 (player)
     val color: Color,
+    val vehicleType: Int = 0, // 0=Sedan/Taxi, 1=Coupe, 2=Van, 3=SUV
     val onsetElapsedRealtime: Long,
     var evaluated: Boolean = false
 )
 
 /**
- * 2. LANDSCAPE DRIVING GAME VIEW (Dr. Driving–Inspired Mini-Game)
- * Fully interactive landscape driving experience featuring:
- * - Landscape-locked viewport with automatic lifecycle cleanup and portrait restoration
- * - Behind-the-car 2.5D perspective road with roadside scenery, animated lane markings & horizon
- * - Draggable, continuously rotating steering wheel control on lower-left
- * - Dedicated gas (accelerator) and brake pedal controls on lower-right
- * - 30-second monotonic active unpaused countdown timer
- * - Collision & overtake avoidance research logging with parent study Trial_ID
+ * 2. LANDSCAPE DRIVING GAME VIEW
+ * Fully redesigned, arcade-grade Dr. Driving simulation featuring:
+ * - Substantial, highly detailed GT Sports Car (190px x 265px) with visible body panels, cabin glass,
+ *   aerodynamic rear wing, wide rubber tires, and animated front steering wheel angle
+ * - High-intensity LED brake lighting system that casts expansive red volumetric glow when braking
+ * - Multiple recognizable traffic vehicles (Sedans, Delivery Vans, Sports Coupes) with perspective scaling
+ * - 3-Lane curving highway with realistic roadside curbs, guardrails, and scenery
+ * - Continuous interactive steering wheel on lower-left and tactile gas/brake pedals on lower-right
+ * - Exact 30-second monotonic active research timing
  */
 @Composable
 private fun LandscapeDrivingGameView(
@@ -1187,17 +1653,6 @@ private fun LandscapeDrivingGameView(
     onActivityCompleted: () -> Unit,
     onBack: () -> Unit
 ) {
-    // 1. Enforce Landscape Orientation during driving gameplay and restore on exit
-    val context = LocalContext.current
-    DisposableEffect(Unit) {
-        val activity = context as? Activity
-        val originalOrientation = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        onDispose {
-            activity?.requestedOrientation = originalOrientation
-        }
-    }
-
     var playerLane by remember { mutableIntStateOf(1) } // 0=Left, 1=Center, 2=Right
     var carLateralOffset by remember { mutableFloatStateOf(0f) } // -100f to +100f
     var speedKmH by remember { mutableIntStateOf(60) }
@@ -1245,7 +1700,7 @@ private fun LandscapeDrivingGameView(
                 if (abs(wheelRotationAngle) < 0.8f) wheelRotationAngle = 0f
             }
 
-            // Acceleration & Braking physics
+            // Acceleration & Braking dynamics
             if (isAccelerating) {
                 speedKmH = (speedKmH + 2).coerceAtMost(120)
             } else if (isBraking) {
@@ -1255,7 +1710,7 @@ private fun LandscapeDrivingGameView(
                 else if (speedKmH < 60) speedKmH = (speedKmH + 1).coerceAtMost(60)
             }
 
-            // Steering dynamics: wheel rotation drives car lateral movement
+            // Steering dynamics: wheel rotation drives lateral car position
             val steerDelta = (wheelRotationAngle / 70f) * (speedKmH / 60f) * 3.8f
             carLateralOffset = (carLateralOffset + steerDelta).coerceIn(-100f, 100f)
 
@@ -1275,14 +1730,15 @@ private fun LandscapeDrivingGameView(
             roadScrollOffset = (roadScrollOffset + (speedKmH / 400f) * 0.05f) % 1.0f
             roadCurveOffset = sin(distanceTraveledMeters * 0.012f) * 50f
 
-            // Traffic generation (approaching in 1 of 3 lanes)
+            // Traffic generation
             if (now - lastTrafficSpawn > 2200L) {
                 lastTrafficSpawn = now
                 val lane = Random.nextInt(0, 3)
-                val carColor = when (Random.nextInt(0, 4)) {
-                    0 -> Color(0xFF3B82F6) // Blue sedan
-                    1 -> Color(0xFFEAB308) // Yellow taxi
-                    2 -> Color(0xFF10B981) // Green delivery
+                val type = Random.nextInt(0, 4)
+                val carColor = when (type) {
+                    0 -> Color(0xFFEAB308) // Yellow taxi
+                    1 -> Color(0xFF3B82F6) // Blue coupe
+                    2 -> Color(0xFF10B981) // Green delivery van
                     else -> Color(0xFFA855F7) // Purple crossover
                 }
                 trafficCars.add(
@@ -1291,6 +1747,7 @@ private fun LandscapeDrivingGameView(
                         lane = lane,
                         depth = 0.0f,
                         color = carColor,
+                        vehicleType = type,
                         onsetElapsedRealtime = now
                     )
                 )
@@ -1310,7 +1767,6 @@ private fun LandscapeDrivingGameView(
 
                     val isSameLane = (playerLane == traffic.lane)
                     if (isSameLane) {
-                        // Crash into traffic car! No qualifying avoidance maneuver executed
                         trafficCollisions++
                         speedKmH = (speedKmH - 30).coerceAtLeast(20)
                         drivingScore = (drivingScore - 30).coerceAtLeast(0)
@@ -1323,20 +1779,19 @@ private fun LandscapeDrivingGameView(
                                 "stayed_in_lane",
                                 "collision",
                                 trialAttemptId,
-                                -1L, // Unmeasured/NA latency for collisions under task rules
+                                -1L,
                                 "encounter=${traffic.vehicleId},trafficLane=${traffic.lane},playerLane=$playerLane,speed=$speedKmH"
                             )
                         }
                     } else {
-                        // Avoided traffic successfully!
                         trafficAvoided++
-                        drivingScore += 40
+                        drivingScore += 45
 
                         val qualifyingSteerTime = pendingSteerTime
                         val steerLatency = if (qualifyingSteerTime > 0L && qualifyingSteerTime >= traffic.onsetElapsedRealtime) {
                             qualifyingSteerTime - traffic.onsetElapsedRealtime
                         } else {
-                            -1L // Pre-positioned or no qualifying maneuver needed
+                            -1L
                         }
 
                         if (steerLatency > 0L) {
@@ -1385,7 +1840,7 @@ private fun LandscapeDrivingGameView(
             delay(35L)
         }
 
-        // On 30-second official trial expired, emit final summary
+        // On 30-second official trial expired
         if (!isGameRunning && timeRemainingSeconds == 0 && distanceTraveledMeters > 0f && trialResults == null) {
             val avgLat = if (latencyEventsCount > 0) totalLatencySum / latencyEventsCount else -1L
             onTrialFinished(
@@ -1408,28 +1863,27 @@ private fun LandscapeDrivingGameView(
 
     LaunchedEffect(collisionFlash) {
         if (collisionFlash) {
-            delay(300)
+            delay(300L)
             collisionFlash = false
         }
     }
 
-    // Full-Screen Landscape Container
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(Color(0xFF0F172A))
     ) {
-        // 2.5D Perspective Road Canvas
         Canvas(modifier = Modifier.fillMaxSize()) {
             val width = size.width
             val height = size.height
-            val horizonY = height * 0.38f
+
+            val horizonY = height * 0.28f
             val bottomY = height
 
-            // Sky & Twilight Gradient
+            // 1. SKY & SUNSET HORIZON
             drawRect(
                 brush = Brush.verticalGradient(
-                    colors = listOf(Color(0xFF020617), Color(0xFF0369A1)),
+                    colors = listOf(Color(0xFF0F172A), Color(0xFF1E1B4B), Color(0xFF312E81)),
                     startY = 0f,
                     endY = horizonY
                 ),
@@ -1437,20 +1891,20 @@ private fun LandscapeDrivingGameView(
                 size = Size(width, horizonY)
             )
 
-            // Distant skyline / mountains silhouette on horizon
-            for (i in 0..12) {
-                val mX = (width / 12f) * i
-                val mW = width / 10f
-                val mH = 14f + sin(i.toFloat() * 1.5f) * 10f
-                drawRoundRect(
-                    color = Color(0xFF0C4A6E),
-                    topLeft = Offset(mX - mW / 2f, horizonY - mH),
-                    size = Size(mW, mH),
-                    cornerRadius = CornerRadius(6f, 6f)
-                )
+            // Distant Mountains
+            val mtnPath = Path().apply {
+                moveTo(0f, horizonY)
+                lineTo(width * 0.15f, horizonY - 35f)
+                lineTo(width * 0.32f, horizonY - 12f)
+                lineTo(width * 0.52f, horizonY - 48f)
+                lineTo(width * 0.74f, horizonY - 20f)
+                lineTo(width * 0.88f, horizonY - 40f)
+                lineTo(width, horizonY)
+                close()
             }
+            drawPath(mtnPath, Color(0xFF1E293B))
 
-            // Roadside Terrain Ground
+            // 2. ROADSIDE TERRAIN GROUND
             drawRect(
                 brush = Brush.verticalGradient(
                     colors = listOf(Color(0xFF064E3B), Color(0xFF022C22)),
@@ -1461,9 +1915,9 @@ private fun LandscapeDrivingGameView(
                 size = Size(width, bottomY - horizonY)
             )
 
-            // Road Perspective Geometry
-            val roadBottomW = width * 0.84f
-            val roadHorizonW = width * 0.22f
+            // 3. ROAD PERSPECTIVE GEOMETRY
+            val roadBottomW = width * 0.86f
+            val roadHorizonW = width * 0.24f
             val horizonCenter = width / 2f + roadCurveOffset * 0.35f
             val bottomCenter = width / 2f + roadCurveOffset
 
@@ -1472,7 +1926,7 @@ private fun LandscapeDrivingGameView(
             val leftHorizonX = horizonCenter - roadHorizonW / 2f
             val rightHorizonX = horizonCenter + roadHorizonW / 2f
 
-            // Road Surface
+            // Asphalt Road Surface
             val roadPath = Path().apply {
                 moveTo(leftHorizonX, horizonY)
                 lineTo(rightHorizonX, horizonY)
@@ -1480,10 +1934,17 @@ private fun LandscapeDrivingGameView(
                 lineTo(leftBottomX, bottomY)
                 close()
             }
-            drawPath(roadPath, Color(0xFF1E293B))
+            drawPath(
+                path = roadPath,
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color(0xFF1E293B), Color(0xFF0F172A)),
+                    startY = horizonY,
+                    endY = bottomY
+                )
+            )
 
-            // Roadside Curbs (Alternating red/white curbs on left & right road borders)
-            val curbSegments = 10
+            // Roadside Alternating Red/White Curbs
+            val curbSegments = 12
             for (cIdx in 0..curbSegments) {
                 val depth1 = ((cIdx.toFloat() / curbSegments) + roadScrollOffset * (1f / curbSegments)) % 1.0f
                 val depth2 = (depth1 + (0.8f / curbSegments)).coerceAtMost(1.0f)
@@ -1497,8 +1958,8 @@ private fun LandscapeDrivingGameView(
                     val c2 = horizonCenter + (bottomCenter - horizonCenter) * depth2
 
                     val curbColor = if (cIdx % 2 == 0) Color(0xFFEF4444) else Color(0xFFF8FAFC)
-                    val curbWidth1 = 6f + depth1 * 14f
-                    val curbWidth2 = 6f + depth2 * 14f
+                    val curbWidth1 = 6f + depth1 * 16f
+                    val curbWidth2 = 6f + depth2 * 16f
 
                     // Left curb
                     val lCurb = Path().apply {
@@ -1522,17 +1983,17 @@ private fun LandscapeDrivingGameView(
                 }
             }
 
-            // Three Road Lanes with Animated Dashed Lines
+            // 4. THREE ROAD LANES WITH ANIMATED DASHED LINES
             for (laneDiv in 1..2) {
                 val topX = leftHorizonX + (roadHorizonW / 3f) * laneDiv
                 val botX = leftBottomX + (roadBottomW / 3f) * laneDiv
 
-                for (dashIdx in 0..6) {
-                    val depth = (dashIdx * 0.16f + roadScrollOffset * 0.16f) % 1.0f
+                for (dashIdx in 0..7) {
+                    val depth = (dashIdx * 0.14f + roadScrollOffset * 0.14f) % 1.0f
                     val dashY = horizonY + (bottomY - horizonY) * depth
                     val dashX = topX + (botX - topX) * depth
-                    val dashH = 8f + depth * 22f
-                    val dashW = 2.5f + depth * 4.5f
+                    val dashH = 10f + depth * 32f
+                    val dashW = 3f + depth * 5.5f
 
                     drawRoundRect(
                         color = Color(0xFFFACC15),
@@ -1543,7 +2004,7 @@ private fun LandscapeDrivingGameView(
                 }
             }
 
-            // Approaching Traffic Vehicles
+            // 5. DETAILED TRAFFIC VEHICLES WITH DEPTH SCALING
             for (traffic in trafficCars) {
                 val obsY = horizonY + (bottomY - horizonY) * traffic.depth
                 val currentRoadW = roadHorizonW + (roadBottomW - roadHorizonW) * traffic.depth
@@ -1552,120 +2013,40 @@ private fun LandscapeDrivingGameView(
                 val laneW = currentRoadW / 3f
                 val trafficCenterX = currentLeftX + laneW * traffic.lane + (laneW / 2f)
 
-                val carW = laneW * 0.65f
-                val carH = carW * 0.60f
+                val carW = laneW * 0.68f
+                val carH = carW * 1.35f
 
-                // Traffic shadow
-                drawRoundRect(
-                    color = Color.Black.copy(alpha = 0.5f),
-                    topLeft = Offset(trafficCenterX - carW / 2f, obsY - carH / 2f + 4f),
-                    size = Size(carW, carH),
-                    cornerRadius = CornerRadius(5f, 5f)
-                )
-
-                // Traffic car body
-                drawRoundRect(
+                drawTrafficVehicle(
+                    scope = this,
+                    centerX = trafficCenterX,
+                    centerY = obsY,
+                    width = carW,
+                    height = carH,
                     color = traffic.color,
-                    topLeft = Offset(trafficCenterX - carW / 2f, obsY - carH / 2f),
-                    size = Size(carW, carH),
-                    cornerRadius = CornerRadius(7f, 7f)
-                )
-
-                // Rear windshield & roof
-                drawRoundRect(
-                    color = Color(0xFF0F172A),
-                    topLeft = Offset(trafficCenterX - carW * 0.36f, obsY - carH * 0.32f),
-                    size = Size(carW * 0.72f, carH * 0.35f),
-                    cornerRadius = CornerRadius(4f, 4f)
-                )
-
-                // Dual red taillights
-                drawCircle(
-                    color = Color(0xFFEF4444),
-                    radius = carH * 0.12f,
-                    center = Offset(trafficCenterX - carW * 0.36f, obsY + carH * 0.28f)
-                )
-                drawCircle(
-                    color = Color(0xFFEF4444),
-                    radius = carH * 0.12f,
-                    center = Offset(trafficCenterX + carW * 0.36f, obsY + carH * 0.28f)
+                    type = traffic.vehicleType
                 )
             }
 
-            // Player Car Model (Third-Person View from Behind)
+            // 6. PLAYER CAR MODEL: SUBSTANTIAL, ELEVATED 3D SPORTS CAR
             val playerLaneW = roadBottomW / 3f
             val playerCarCenterX = bottomCenter + (carLateralOffset / 100f) * (playerLaneW * 1.15f)
-            val playerCarY = bottomY - 56f
-            val playerCarW = 82f
-            val playerCarH = 44f
+            val playerCarY = bottomY - 145f
 
-            // Dynamic roll/banking angle when turning
-            val rollAngle = (wheelRotationAngle / 110f) * 12f
+            // Substantial, realistic proportions!
+            val playerCarW = 190f
+            val playerCarH = 265f
 
-            rotate(rollAngle, pivot = Offset(playerCarCenterX, playerCarY)) {
-                // Car shadow
-                drawRoundRect(
-                    color = Color.Black.copy(alpha = 0.55f),
-                    topLeft = Offset(playerCarCenterX - playerCarW / 2f - 4f, playerCarY - playerCarH / 2f + 8f),
-                    size = Size(playerCarW + 8f, playerCarH),
-                    cornerRadius = CornerRadius(8f, 8f)
-                )
-
-                // Wide rear tires
-                drawRoundRect(
-                    color = Color(0xFF0F172A),
-                    topLeft = Offset(playerCarCenterX - playerCarW / 2f - 5f, playerCarY + playerCarH * 0.05f),
-                    size = Size(12f, 18f),
-                    cornerRadius = CornerRadius(3f, 3f)
-                )
-                drawRoundRect(
-                    color = Color(0xFF0F172A),
-                    topLeft = Offset(playerCarCenterX + playerCarW / 2f - 7f, playerCarY + playerCarH * 0.05f),
-                    size = Size(12f, 18f),
-                    cornerRadius = CornerRadius(3f, 3f)
-                )
-
-                // Player car body (Sports Coupe)
-                drawRoundRect(
-                    brush = Brush.verticalGradient(
-                        colors = if (collisionFlash) listOf(Color(0xFFEF4444), Color(0xFF7F1D1D)) else listOf(Color(0xFFDC2626), Color(0xFF991B1B))
-                    ),
-                    topLeft = Offset(playerCarCenterX - playerCarW / 2f, playerCarY - playerCarH / 2f),
-                    size = Size(playerCarW, playerCarH),
-                    cornerRadius = CornerRadius(10f, 10f)
-                )
-
-                // Aerodynamic cabin roof & rear windshield
-                drawRoundRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(Color(0xFF38BDF8), Color(0xFF0F172A))
-                    ),
-                    topLeft = Offset(playerCarCenterX - playerCarW * 0.32f, playerCarY - playerCarH * 0.38f),
-                    size = Size(playerCarW * 0.64f, playerCarH * 0.40f),
-                    cornerRadius = CornerRadius(5f, 5f)
-                )
-
-                // Dual High-Intensity LED Taillights (with extra bright glow when braking!)
-                val tailLightColor = if (isBraking) Color(0xFFFFFFFF) else Color(0xFFFCA5A5)
-                val tailGlowColor = if (isBraking) Color(0xFFEF4444) else Color(0xFFDC2626)
-                drawCircle(color = tailGlowColor, radius = if (isBraking) 10f else 6f, center = Offset(playerCarCenterX - playerCarW * 0.38f, playerCarY + playerCarH * 0.22f))
-                drawCircle(color = tailLightColor, radius = if (isBraking) 5.5f else 3.5f, center = Offset(playerCarCenterX - playerCarW * 0.38f, playerCarY + playerCarH * 0.22f))
-
-                drawCircle(color = tailGlowColor, radius = if (isBraking) 10f else 6f, center = Offset(playerCarCenterX + playerCarW * 0.38f, playerCarY + playerCarH * 0.22f))
-                drawCircle(color = tailLightColor, radius = if (isBraking) 5.5f else 3.5f, center = Offset(playerCarCenterX + playerCarW * 0.38f, playerCarY + playerCarH * 0.22f))
-
-                // Dual chrome exhaust pipes
-                drawCircle(color = Color(0xFF94A3B8), radius = 3.5f, center = Offset(playerCarCenterX - playerCarW * 0.20f, playerCarY + playerCarH * 0.45f))
-                drawCircle(color = Color(0xFF94A3B8), radius = 3.5f, center = Offset(playerCarCenterX + playerCarW * 0.20f, playerCarY + playerCarH * 0.45f))
-
-                // License plate "ADAPT-IQ"
-                drawRoundRect(
-                    color = Color(0xFFF8FAFC),
-                    topLeft = Offset(playerCarCenterX - 14f, playerCarY + playerCarH * 0.20f),
-                    size = Size(28f, 10f),
-                    cornerRadius = CornerRadius(2f, 2f)
-                )
-            }
+            drawPlayerVehicle(
+                scope = this,
+                centerX = playerCarCenterX,
+                centerY = playerCarY,
+                width = playerCarW,
+                height = playerCarH,
+                wheelAngle = wheelRotationAngle,
+                isBraking = isBraking,
+                isAccelerating = isAccelerating,
+                collisionFlash = collisionFlash
+            )
 
             // Full-screen Collision Impact Vignette
             if (collisionFlash) {
@@ -1677,20 +2058,22 @@ private fun LandscapeDrivingGameView(
             }
         }
 
-        // Floating Top Landscape HUD Bar
+        // TOP LANDSCAPE FLOATING HUD BAR
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(horizontal = 20.dp, vertical = 10.dp)
                 .align(Alignment.TopCenter),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Left: Back button & Mode Badge
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedButton(
                     onClick = onBack,
-                    colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Black.copy(alpha = 0.6f))
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Black.copy(alpha = 0.65f)),
+                    border = BorderStroke(1.dp, BorderSubtle),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
                 ) {
                     Text("✕ Exit", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
@@ -1701,7 +2084,7 @@ private fun LandscapeDrivingGameView(
                 ) {
                     Text(
                         text = if (isPractice) "PRACTICE DRIVE" else "OFFICIAL 30s TRIAL",
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         color = Color.White,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.ExtraBold
@@ -1709,28 +2092,30 @@ private fun LandscapeDrivingGameView(
                 }
             }
 
-            // Center: Speedometer, Monotonic Timer & Score
+            // Center: Speedometer, Monotonic Countdown Timer & Score
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = Color.Black.copy(alpha = 0.65f)
+                    color = Color.Black.copy(alpha = 0.75f),
+                    border = BorderStroke(1.dp, if (speedKmH > 90) Color(0xFFEF4444) else BorderSubtle)
                 ) {
                     Text(
                         text = "$speedKmH km/h",
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         color = if (speedKmH > 90) Color(0xFFF87171) else Color(0xFF4ADE80),
-                        fontSize = 13.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
 
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    border = BorderStroke(1.dp, AccentTeal)
                 ) {
                     Text(
                         text = if (isPractice && !isGameRunning) "PRACTICE" else "⏱️ 00:%02d".format(timeRemainingSeconds),
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -1739,29 +2124,31 @@ private fun LandscapeDrivingGameView(
 
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = Color.Black.copy(alpha = 0.65f)
+                    color = Color.Black.copy(alpha = 0.75f),
+                    border = BorderStroke(1.dp, BorderSubtle)
                 ) {
                     Text(
                         text = "Score: $drivingScore • ${distanceTraveledMeters.toInt()}m",
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         color = Color.White,
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
 
             // Right: Traffic Stats & Pause/Resume
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = Color.Black.copy(alpha = 0.65f)
+                    color = Color.Black.copy(alpha = 0.75f),
+                    border = BorderStroke(1.dp, BorderSubtle)
                 ) {
                     Text(
-                        text = "✓ $trafficAvoided  💥 $trafficCollisions",
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        text = "✓ $trafficAvoided   💥 $trafficCollisions",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         color = Color.White,
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -1769,7 +2156,8 @@ private fun LandscapeDrivingGameView(
                 if (isGameRunning) {
                     Button(
                         onClick = onPauseResume,
-                        colors = ButtonDefaults.buttonColors(containerColor = if (isGamePaused) Color(0xFF16A34A) else Color(0xFF334155))
+                        colors = ButtonDefaults.buttonColors(containerColor = if (isGamePaused) Color(0xFF16A34A) else Color(0xFF334155)),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
                     ) {
                         Text(if (isGamePaused) "▶ Resume" else "⏸ Pause", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
@@ -1777,29 +2165,29 @@ private fun LandscapeDrivingGameView(
             }
         }
 
-        // Floating Dynamic Guidance / Steering Status
+        // Floating Dynamic Steering Status Pill
         Surface(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 52.dp),
+                .padding(top = 58.dp),
             shape = RoundedCornerShape(16.dp),
-            color = Color.Black.copy(alpha = 0.55f)
+            color = Color.Black.copy(alpha = 0.65f)
         ) {
             Text(
                 text = steeringStatus,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp),
                 color = if (normalizedDeviation > 1.0f) Color(0xFFF87171) else Color(0xFF38BDF8),
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold
             )
         }
 
-        // Lower-Left Area: Interactive Draggable Steering Wheel Control
+        // LOWER-LEFT: INTERACTIVE DRAGGABLE RACING STEERING WHEEL
         Box(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(start = 28.dp, bottom = 18.dp)
-                .size(152.dp)
+                .size(160.dp)
                 .pointerInput(isGameRunning, isPractice) {
                     val cx = size.width / 2f
                     val cy = size.height / 2f
@@ -1812,12 +2200,8 @@ private fun LandscapeDrivingGameView(
                             dragStartAngle = Math.toDegrees(atan2((offset.y - cy).toDouble(), (offset.x - cx).toDouble())).toFloat()
                             dragStartWheelAngle = wheelRotationAngle
                         },
-                        onDragEnd = {
-                            isDraggingWheel = false
-                        },
-                        onDragCancel = {
-                            isDraggingWheel = false
-                        },
+                        onDragEnd = { isDraggingWheel = false },
+                        onDragCancel = { isDraggingWheel = false },
                         onDrag = { change, dragAmount ->
                             change.consume()
                             val curAngle = Math.toDegrees(atan2((change.position.y - cy).toDouble(), (change.position.x - cx).toDouble())).toFloat()
@@ -1825,12 +2209,11 @@ private fun LandscapeDrivingGameView(
                             while (deltaAngle > 180f) deltaAngle -= 360f
                             while (deltaAngle < -180f) deltaAngle += 360f
 
-                            // Combine circular rotation angle and horizontal drag amount for maximum responsiveness
-                            val horizontalAssist = dragAmount.x * 0.50f
+                            val horizontalAssist = dragAmount.x * 0.45f
                             val newAngle = (dragStartWheelAngle + deltaAngle + horizontalAssist).coerceIn(-110f, 110f)
                             wheelRotationAngle = newAngle
 
-                            // Research event logging on significant steering input
+                            // Research event logging on significant steering action
                             if (abs(newAngle) > 28f) {
                                 val now = SystemClock.elapsedRealtime()
                                 if (now - lastSteerLogTime > 350L) {
@@ -1862,17 +2245,13 @@ private fun LandscapeDrivingGameView(
                 val cy = h / 2f
                 val rOuter = w * 0.46f
 
-                // Drop shadow
-                drawCircle(
-                    color = Color.Black.copy(alpha = 0.5f),
-                    radius = rOuter,
-                    center = Offset(cx, cy + 6f)
-                )
+                // Wheel Drop Shadow
+                drawCircle(color = Color.Black.copy(alpha = 0.55f), radius = rOuter, center = Offset(cx, cy + 8f))
 
-                // Rotate the entire wheel assembly in response to drag
                 rotate(wheelRotationAngle, pivot = Offset(cx, cy)) {
-                    // Outer Steering Rim
                     val rimStroke = rOuter * 0.22f
+
+                    // Outer Leather Grip Rim
                     drawCircle(
                         color = Color(0xFF1E293B),
                         radius = rOuter - rimStroke / 2f,
@@ -1882,8 +2261,8 @@ private fun LandscapeDrivingGameView(
                     // Textured grip notches at 9 & 3 o'clock
                     drawArc(
                         color = Color(0xFF334155),
-                        startAngle = 160f,
-                        sweepAngle = 40f,
+                        startAngle = 158f,
+                        sweepAngle = 44f,
                         useCenter = false,
                         style = Stroke(width = rimStroke * 1.15f),
                         topLeft = Offset(cx - rOuter + rimStroke / 2f, cy - rOuter + rimStroke / 2f),
@@ -1891,15 +2270,15 @@ private fun LandscapeDrivingGameView(
                     )
                     drawArc(
                         color = Color(0xFF334155),
-                        startAngle = -20f,
-                        sweepAngle = 40f,
+                        startAngle = -22f,
+                        sweepAngle = 44f,
                         useCenter = false,
                         style = Stroke(width = rimStroke * 1.15f),
                         topLeft = Offset(cx - rOuter + rimStroke / 2f, cy - rOuter + rimStroke / 2f),
                         size = Size((rOuter - rimStroke / 2f) * 2f, (rOuter - rimStroke / 2f) * 2f)
                     )
 
-                    // Racing teal center alignment strip at 12 o'clock
+                    // Racing Teal Center Alignment Strip at 12 o'clock
                     drawArc(
                         color = AccentTeal,
                         startAngle = 262f,
@@ -1910,71 +2289,42 @@ private fun LandscapeDrivingGameView(
                         size = Size((rOuter - rimStroke / 2f) * 2f, (rOuter - rimStroke / 2f) * 2f)
                     )
 
-                    // 3 Structural Spokes
-                    val spokeWidth = 14f
+                    // 3 Brushed Aluminum Structural Spokes
+                    val spokeWidth = 15f
                     val hubRadius = rOuter * 0.38f
-                    drawLine(
-                        color = Color(0xFF475569),
-                        start = Offset(cx - hubRadius, cy),
-                        end = Offset(cx - rOuter + rimStroke, cy),
-                        strokeWidth = spokeWidth
-                    )
-                    drawLine(
-                        color = Color(0xFF475569),
-                        start = Offset(cx + hubRadius, cy),
-                        end = Offset(cx + rOuter - rimStroke, cy),
-                        strokeWidth = spokeWidth
-                    )
-                    drawLine(
-                        color = Color(0xFF475569),
-                        start = Offset(cx, cy + hubRadius),
-                        end = Offset(cx, cy + rOuter - rimStroke),
-                        strokeWidth = spokeWidth
-                    )
+                    drawLine(color = Color(0xFF64748B), start = Offset(cx - hubRadius, cy), end = Offset(cx - rOuter + rimStroke, cy), strokeWidth = spokeWidth)
+                    drawLine(color = Color(0xFF64748B), start = Offset(cx + hubRadius, cy), end = Offset(cx + rOuter - rimStroke, cy), strokeWidth = spokeWidth)
+                    drawLine(color = Color(0xFF64748B), start = Offset(cx, cy + hubRadius), end = Offset(cx, cy + rOuter - rimStroke), strokeWidth = spokeWidth)
 
-                    // Center Hub
-                    drawCircle(
-                        color = Color(0xFF0F172A),
-                        radius = hubRadius,
-                        center = Offset(cx, cy)
-                    )
-                    drawCircle(
-                        color = Color(0xFF64748B),
-                        radius = hubRadius,
-                        center = Offset(cx, cy),
-                        style = Stroke(width = 3f)
-                    )
-                    // Hub horn emblem
-                    drawCircle(
-                        color = AccentTeal,
-                        radius = hubRadius * 0.40f,
-                        center = Offset(cx, cy)
-                    )
+                    // Center Hub with Adapt-IQ Emblem
+                    drawCircle(color = Color(0xFF0F172A), radius = hubRadius, center = Offset(cx, cy))
+                    drawCircle(color = Color(0xFF94A3B8), radius = hubRadius, center = Offset(cx, cy), style = Stroke(width = 3f))
+                    drawCircle(color = AccentTeal, radius = hubRadius * 0.42f, center = Offset(cx, cy))
                 }
             }
         }
 
-        // Lower-Right Area: Gas & Brake Pedal Controls
+        // LOWER-RIGHT: GAS & BRAKE PEDAL CONTROLS
         Row(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 28.dp, bottom = 18.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(18.dp),
             verticalAlignment = Alignment.Bottom
         ) {
             // Brake Pedal
             Box(
                 modifier = Modifier
-                    .width(66.dp)
-                    .height(82.dp)
+                    .width(72.dp)
+                    .height(88.dp)
                     .background(
                         color = if (isBraking) StatusError else Color(0xFF7F1D1D),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(12.dp)
                     )
                     .border(
                         width = 2.dp,
                         color = if (isBraking) Color(0xFFFCA5A5) else StatusError,
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(12.dp)
                     )
                     .pointerInput(isGameRunning) {
                         detectTapGestures(
@@ -1998,29 +2348,29 @@ private fun LandscapeDrivingGameView(
                     repeat(3) {
                         Box(
                             modifier = Modifier
-                                .width(42.dp)
+                                .width(46.dp)
                                 .height(3.dp)
                                 .background(Color(0xFFB91C1C).copy(alpha = 0.8f), RoundedCornerShape(1.dp))
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(5.dp))
                     }
-                    Text("BRAKE", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("BRAKE", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
                 }
             }
 
-            // Gas Pedal (taller)
+            // Gas (Accelerator) Pedal
             Box(
                 modifier = Modifier
-                    .width(58.dp)
-                    .height(112.dp)
+                    .width(64.dp)
+                    .height(118.dp)
                     .background(
                         color = if (isAccelerating) StatusSuccess else Color(0xFF14532D),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(12.dp)
                     )
                     .border(
                         width = 2.dp,
                         color = if (isAccelerating) Color(0xFF86EFAC) else StatusSuccess,
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(12.dp)
                     )
                     .pointerInput(isGameRunning) {
                         detectTapGestures(
@@ -2044,26 +2394,26 @@ private fun LandscapeDrivingGameView(
                     repeat(4) {
                         Box(
                             modifier = Modifier
-                                .width(36.dp)
+                                .width(40.dp)
                                 .height(3.dp)
                                 .background(Color(0xFF15803D).copy(alpha = 0.8f), RoundedCornerShape(1.dp))
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(7.dp))
                     }
-                    Text("GAS", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("GAS", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
                 }
             }
         }
 
-        // Overlay: Practice Start & Official Trial Launch Card
+        // PRACTICE LAUNCH OVERLAY
         if (isPractice && !isGameRunning && trialResults == null) {
             AdaptIQSurfaceCard(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .width(420.dp),
-                shape = RoundedCornerShape(16.dp),
+                    .width(440.dp),
+                shape = RoundedCornerShape(18.dp),
                 containerColor = SurfaceElevatedVariant,
-                borderColor = BorderSubtle
+                borderColor = AccentBlue
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -2106,13 +2456,13 @@ private fun LandscapeDrivingGameView(
             }
         }
 
-        // Overlay: Pause Dialog
+        // FROSTED PAUSE OVERLAY
         if (isGamePaused) {
             AdaptIQSurfaceCard(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .width(360.dp),
-                shape = RoundedCornerShape(16.dp),
+                    .width(380.dp),
+                shape = RoundedCornerShape(18.dp),
                 containerColor = SurfaceElevatedVariant,
                 borderColor = BorderSubtle
             ) {
@@ -2142,14 +2492,14 @@ private fun LandscapeDrivingGameView(
             }
         }
 
-        // Overlay: Scored Trial Completed Results Dialog
+        // TRIAL COMPLETED RESULTS DIALOG
         if (trialResults != null) {
             val res = trialResults
             AdaptIQSurfaceCard(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .width(460.dp),
-                shape = RoundedCornerShape(16.dp),
+                    .width(480.dp),
+                shape = RoundedCornerShape(18.dp),
                 containerColor = SurfaceElevatedVariant,
                 borderColor = StatusSuccess
             ) {
@@ -2215,5 +2565,313 @@ private fun LandscapeDrivingGameView(
                 }
             }
         }
+    }
+}
+
+/**
+ * Detailed Canvas Drawing of Player GT Sports Car
+ * Elevated Rear 3D Perspective (190px x 265px)
+ */
+private fun drawPlayerVehicle(
+    scope: DrawScope,
+    centerX: Float,
+    centerY: Float,
+    width: Float,
+    height: Float,
+    wheelAngle: Float,
+    isBraking: Boolean,
+    isAccelerating: Boolean,
+    collisionFlash: Boolean
+) {
+    with(scope) {
+        val rollAngle = (wheelAngle / 110f) * 11f
+
+        rotate(rollAngle, pivot = Offset(centerX, centerY)) {
+            // 1. Ambient Ground Shadow
+            drawRoundRect(
+                color = Color.Black.copy(alpha = 0.55f),
+                topLeft = Offset(centerX - width * 0.52f, centerY - height * 0.45f + 12f),
+                size = Size(width * 1.04f, height * 0.95f),
+                cornerRadius = CornerRadius(22f, 22f)
+            )
+
+            // 2. Wide Tires
+            val tireW = width * 0.14f
+            val tireH = height * 0.22f
+
+            // Rear Left & Right Tires (Straight)
+            drawRoundRect(
+                color = Color(0xFF0F172A),
+                topLeft = Offset(centerX - width * 0.48f, centerY + height * 0.16f),
+                size = Size(tireW, tireH),
+                cornerRadius = CornerRadius(5f, 5f)
+            )
+            drawRoundRect(
+                color = Color(0xFF0F172A),
+                topLeft = Offset(centerX + width * 0.48f - tireW, centerY + height * 0.16f),
+                size = Size(tireW, tireH),
+                cornerRadius = CornerRadius(5f, 5f)
+            )
+
+            // Front Left & Right Tires (Steered with wheel angle!)
+            val frontSteerAngle = (wheelAngle / 110f) * 22f
+            rotate(frontSteerAngle, pivot = Offset(centerX - width * 0.48f + tireW / 2f, centerY - height * 0.26f)) {
+                drawRoundRect(
+                    color = Color(0xFF0F172A),
+                    topLeft = Offset(centerX - width * 0.48f, centerY - height * 0.36f),
+                    size = Size(tireW, tireH),
+                    cornerRadius = CornerRadius(5f, 5f)
+                )
+            }
+            rotate(frontSteerAngle, pivot = Offset(centerX + width * 0.48f - tireW / 2f, centerY - height * 0.26f)) {
+                drawRoundRect(
+                    color = Color(0xFF0F172A),
+                    topLeft = Offset(centerX + width * 0.48f - tireW, centerY - height * 0.36f),
+                    size = Size(tireW, tireH),
+                    cornerRadius = CornerRadius(5f, 5f)
+                )
+            }
+
+            // 3. Widebody Chassis Lower Diffuser
+            drawRoundRect(
+                color = Color(0xFF1E293B),
+                topLeft = Offset(centerX - width * 0.42f, centerY + height * 0.30f),
+                size = Size(width * 0.84f, height * 0.15f),
+                cornerRadius = CornerRadius(8f, 8f)
+            )
+            // Quad Chrome Exhaust Pipes
+            val exhaustRadius = 5.5f
+            val exhaustY = centerY + height * 0.44f
+            drawCircle(color = Color(0xFF94A3B8), radius = exhaustRadius, center = Offset(centerX - width * 0.26f, exhaustY))
+            drawCircle(color = Color(0xFF0F172A), radius = exhaustRadius * 0.6f, center = Offset(centerX - width * 0.26f, exhaustY))
+            drawCircle(color = Color(0xFF94A3B8), radius = exhaustRadius, center = Offset(centerX - width * 0.18f, exhaustY))
+            drawCircle(color = Color(0xFF0F172A), radius = exhaustRadius * 0.6f, center = Offset(centerX - width * 0.18f, exhaustY))
+
+            drawCircle(color = Color(0xFF94A3B8), radius = exhaustRadius, center = Offset(centerX + width * 0.18f, exhaustY))
+            drawCircle(color = Color(0xFF0F172A), radius = exhaustRadius * 0.6f, center = Offset(centerX + width * 0.18f, exhaustY))
+            drawCircle(color = Color(0xFF94A3B8), radius = exhaustRadius, center = Offset(centerX + width * 0.26f, exhaustY))
+            drawCircle(color = Color(0xFF0F172A), radius = exhaustRadius * 0.6f, center = Offset(centerX + width * 0.26f, exhaustY))
+
+            // 4. Main Sculpted Body (Vibrant Candy Red Sports Car)
+            val bodyBrush = Brush.verticalGradient(
+                colors = if (collisionFlash) {
+                    listOf(Color(0xFFEF4444), Color(0xFF7F1D1D))
+                } else {
+                    listOf(Color(0xFFDC2626), Color(0xFFB91C1C), Color(0xFF7F1D1D))
+                },
+                startY = centerY - height * 0.5f,
+                endY = centerY + height * 0.4f
+            )
+
+            drawRoundRect(
+                brush = bodyBrush,
+                topLeft = Offset(centerX - width * 0.44f, centerY - height * 0.45f),
+                size = Size(width * 0.88f, height * 0.85f),
+                cornerRadius = CornerRadius(24f, 24f)
+            )
+
+            // Dual Racing Center Stripes
+            val stripeW = 8f
+            drawRect(
+                color = Color.White.copy(alpha = 0.85f),
+                topLeft = Offset(centerX - stripeW - 3f, centerY - height * 0.45f),
+                size = Size(stripeW, height * 0.85f)
+            )
+            drawRect(
+                color = Color.White.copy(alpha = 0.85f),
+                topLeft = Offset(centerX + 3f, centerY - height * 0.45f),
+                size = Size(stripeW, height * 0.85f)
+            )
+
+            // Front Hood Air Extractor Vents
+            drawRoundRect(
+                color = Color(0xFF1E293B),
+                topLeft = Offset(centerX - width * 0.28f, centerY - height * 0.38f),
+                size = Size(width * 0.18f, height * 0.08f),
+                cornerRadius = CornerRadius(3f, 3f)
+            )
+            drawRoundRect(
+                color = Color(0xFF1E293B),
+                topLeft = Offset(centerX + width * 0.10f, centerY - height * 0.38f),
+                size = Size(width * 0.18f, height * 0.08f),
+                cornerRadius = CornerRadius(3f, 3f)
+            )
+
+            // 5. Aerodynamic Cabin Glasshouse
+            val cabinW = width * 0.62f
+            val cabinH = height * 0.44f
+            val cabinY = centerY - height * 0.22f
+
+            // Front Windshield
+            drawRoundRect(
+                brush = Brush.verticalGradient(listOf(Color(0xFF0F172A), Color(0xFF38BDF8).copy(alpha = 0.7f))),
+                topLeft = Offset(centerX - cabinW * 0.44f, cabinY),
+                size = Size(cabinW * 0.88f, cabinH * 0.32f),
+                cornerRadius = CornerRadius(8f, 8f)
+            )
+
+            // Carbon-Fiber Roof Panel
+            drawRoundRect(
+                color = Color(0xFF0F172A),
+                topLeft = Offset(centerX - cabinW * 0.42f, cabinY + cabinH * 0.28f),
+                size = Size(cabinW * 0.84f, cabinH * 0.34f),
+                cornerRadius = CornerRadius(6f, 6f)
+            )
+
+            // Rear Windshield Glass with Sky Reflection
+            drawRoundRect(
+                brush = Brush.verticalGradient(listOf(Color(0xFF38BDF8), Color(0xFF0B1222))),
+                topLeft = Offset(centerX - cabinW * 0.44f, cabinY + cabinH * 0.60f),
+                size = Size(cabinW * 0.88f, cabinH * 0.38f),
+                cornerRadius = CornerRadius(8f, 8f)
+            )
+
+            // Side Mirrors
+            val mirrorW = 16f
+            val mirrorH = 9f
+            drawRoundRect(color = Color(0xFF991B1B), topLeft = Offset(centerX - width * 0.48f - mirrorW, cabinY + 8f), size = Size(mirrorW, mirrorH), cornerRadius = CornerRadius(3f, 3f))
+            drawRoundRect(color = Color(0xFF38BDF8), topLeft = Offset(centerX - width * 0.48f - mirrorW + 2f, cabinY + 9f), size = Size(mirrorW - 4f, mirrorH - 2f), cornerRadius = CornerRadius(2f, 2f))
+
+            drawRoundRect(color = Color(0xFF991B1B), topLeft = Offset(centerX + width * 0.48f, cabinY + 8f), size = Size(mirrorW, mirrorH), cornerRadius = CornerRadius(3f, 3f))
+            drawRoundRect(color = Color(0xFF38BDF8), topLeft = Offset(centerX + width * 0.48f + 2f, cabinY + 9f), size = Size(mirrorW - 4f, mirrorH - 2f), cornerRadius = CornerRadius(2f, 2f))
+
+            // 6. High-Downforce Carbon Rear Wing / Spoiler
+            val wingW = width * 0.82f
+            val wingH = 16f
+            val wingY = centerY + height * 0.32f
+
+            // Dual Spoiler Mounting Pylons
+            drawRect(color = Color(0xFF0F172A), topLeft = Offset(centerX - width * 0.24f, wingY - 6f), size = Size(6f, 14f))
+            drawRect(color = Color(0xFF0F172A), topLeft = Offset(centerX + width * 0.24f - 6f, wingY - 6f), size = Size(6f, 14f))
+
+            // Main Wing Blade
+            drawRoundRect(
+                color = Color(0xFF0F172A),
+                topLeft = Offset(centerX - wingW / 2f, wingY),
+                size = Size(wingW, wingH),
+                cornerRadius = CornerRadius(4f, 4f)
+            )
+
+            // 7. Dynamic LED Taillights System
+            val tailLightY = centerY + height * 0.36f
+            val tailLightW = width * 0.28f
+            val tailLightH = 9f
+
+            val lightGlowColor = if (isBraking) Color(0xFFEF4444) else Color(0xFFDC2626)
+            val lightCoreColor = if (isBraking) Color.White else Color(0xFFFCA5A5)
+
+            // Volumetric Braking Glow on Pavement
+            if (isBraking) {
+                drawOval(
+                    color = Color(0xFFDC2626).copy(alpha = 0.55f),
+                    topLeft = Offset(centerX - width * 0.55f, tailLightY - 8f),
+                    size = Size(width * 1.10f, 42f)
+                )
+            }
+
+            // Left Taillight Blade
+            drawRoundRect(
+                color = lightGlowColor,
+                topLeft = Offset(centerX - width * 0.38f, tailLightY),
+                size = Size(tailLightW, tailLightH),
+                cornerRadius = CornerRadius(3f, 3f)
+            )
+            drawRoundRect(
+                color = lightCoreColor,
+                topLeft = Offset(centerX - width * 0.36f, tailLightY + 2f),
+                size = Size(tailLightW - 4f, tailLightH - 4f),
+                cornerRadius = CornerRadius(2f, 2f)
+            )
+
+            // Right Taillight Blade
+            drawRoundRect(
+                color = lightGlowColor,
+                topLeft = Offset(centerX + width * 0.38f - tailLightW, tailLightY),
+                size = Size(tailLightW, tailLightH),
+                cornerRadius = CornerRadius(3f, 3f)
+            )
+            drawRoundRect(
+                color = lightCoreColor,
+                topLeft = Offset(centerX + width * 0.38f - tailLightW + 2f, tailLightY + 2f),
+                size = Size(tailLightW - 4f, tailLightH - 4f),
+                cornerRadius = CornerRadius(2f, 2f)
+            )
+
+            // Illuminated License Plate "ADAPT-IQ"
+            drawRoundRect(
+                color = Color(0xFFF8FAFC),
+                topLeft = Offset(centerX - 24f, tailLightY + 10f),
+                size = Size(48f, 13f),
+                cornerRadius = CornerRadius(2f, 2f)
+            )
+        }
+    }
+}
+
+/**
+ * Detailed Canvas Drawing of Traffic Vehicles
+ */
+private fun drawTrafficVehicle(
+    scope: DrawScope,
+    centerX: Float,
+    centerY: Float,
+    width: Float,
+    height: Float,
+    color: Color,
+    type: Int
+) {
+    with(scope) {
+        // Shadow
+        drawRoundRect(
+            color = Color.Black.copy(alpha = 0.50f),
+            topLeft = Offset(centerX - width * 0.50f, centerY - height * 0.45f + 6f),
+            size = Size(width, height),
+            cornerRadius = CornerRadius(10f, 10f)
+        )
+
+        // Tires
+        val tireW = width * 0.16f
+        val tireH = height * 0.20f
+        drawRoundRect(color = Color(0xFF0F172A), topLeft = Offset(centerX - width * 0.48f, centerY - height * 0.30f), size = Size(tireW, tireH), cornerRadius = CornerRadius(3f, 3f))
+        drawRoundRect(color = Color(0xFF0F172A), topLeft = Offset(centerX + width * 0.48f - tireW, centerY - height * 0.30f), size = Size(tireW, tireH), cornerRadius = CornerRadius(3f, 3f))
+        drawRoundRect(color = Color(0xFF0F172A), topLeft = Offset(centerX - width * 0.48f, centerY + height * 0.15f), size = Size(tireW, tireH), cornerRadius = CornerRadius(3f, 3f))
+        drawRoundRect(color = Color(0xFF0F172A), topLeft = Offset(centerX + width * 0.48f - tireW, centerY + height * 0.15f), size = Size(tireW, tireH), cornerRadius = CornerRadius(3f, 3f))
+
+        // Vehicle Body
+        drawRoundRect(
+            brush = Brush.verticalGradient(listOf(color, color.copy(alpha = 0.75f))),
+            topLeft = Offset(centerX - width * 0.44f, centerY - height * 0.45f),
+            size = Size(width * 0.88f, height * 0.90f),
+            cornerRadius = CornerRadius(12f, 12f)
+        )
+
+        // Roof / Cabin Glasshouse
+        val cabinW = width * 0.65f
+        val cabinH = height * 0.45f
+        drawRoundRect(
+            color = Color(0xFF0F172A),
+            topLeft = Offset(centerX - cabinW / 2f, centerY - height * 0.20f),
+            size = Size(cabinW, cabinH),
+            cornerRadius = CornerRadius(6f, 6f)
+        )
+
+        // Taxi roof sign if taxi
+        if (type == 0) {
+            drawRoundRect(
+                color = Color(0xFFFDE047),
+                topLeft = Offset(centerX - 16f, centerY - height * 0.05f),
+                size = Size(32f, 10f),
+                cornerRadius = CornerRadius(3f, 3f)
+            )
+        }
+
+        // Dual Red Taillights
+        val tailLightRadius = width * 0.08f
+        val tailY = centerY + height * 0.38f
+        drawCircle(color = Color(0xFFEF4444), radius = tailLightRadius, center = Offset(centerX - width * 0.30f, tailY))
+        drawCircle(color = Color.White, radius = tailLightRadius * 0.45f, center = Offset(centerX - width * 0.30f, tailY))
+
+        drawCircle(color = Color(0xFFEF4444), radius = tailLightRadius, center = Offset(centerX + width * 0.30f, tailY))
+        drawCircle(color = Color.White, radius = tailLightRadius * 0.45f, center = Offset(centerX + width * 0.30f, tailY))
     }
 }

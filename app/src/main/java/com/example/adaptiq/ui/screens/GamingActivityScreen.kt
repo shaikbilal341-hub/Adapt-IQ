@@ -3,6 +3,7 @@ package com.example.adaptiq.ui.screens
 import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.os.SystemClock
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -164,7 +165,7 @@ fun GamingActivityScreen(
         }
     }
 
-    fun handleBackNavigation(modeStr: String) {
+    fun handleExitMiniGame(modeStr: String) {
         if (isGameRunning && !isPractice && !isGameFinished) {
             val elapsed = accumulatedActiveMs + if (activeStartRealtime > 0L) (SystemClock.elapsedRealtime() - activeStartRealtime) else 0L
             onLogEvent(
@@ -179,7 +180,8 @@ fun GamingActivityScreen(
         }
         isGameRunning = false
         isGamePaused = false
-        onBack()
+        trialResults = null
+        gameMode = GamingMode.SELECTION
     }
 
     // 1. RUNNER GAME: Dedicated Full-Screen Immersive Arcade View (Portrait)
@@ -220,8 +222,7 @@ fun GamingActivityScreen(
             },
             onActivityCompleted = onActivityCompleted,
             onBack = {
-                handleBackNavigation("runner")
-                gameMode = GamingMode.SELECTION
+                handleExitMiniGame("runner")
             }
         )
         return
@@ -265,8 +266,7 @@ fun GamingActivityScreen(
             },
             onActivityCompleted = onActivityCompleted,
             onBack = {
-                handleBackNavigation("driving")
-                gameMode = GamingMode.SELECTION
+                handleExitMiniGame("driving")
             }
         )
         return
@@ -326,7 +326,7 @@ fun GamingActivityScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(
-                                text = "Cyber Runner 3D",
+                                text = "Temple Explorer 3D",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = TextPrimary
@@ -336,7 +336,7 @@ fun GamingActivityScreen(
                                 color = AccentTeal.copy(alpha = 0.15f)
                             ) {
                                 Text(
-                                    text = "PORTRAIT",
+                                    text = "3D RUNNER",
                                     color = AccentTeal,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
@@ -346,7 +346,7 @@ fun GamingActivityScreen(
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Full-screen 3-lane sci-fi runner. Swipe on the track to jump laser hurdles, slide under overhead arch gantries, and dodge heavy barricades.",
+                            text = "Temple Run–style 3D endless runner. Navigate 3 stone-paved lanes through ancient ruins. Swipe to leap fallen tree logs, slide under ruined stone arches, and dodge giant carved idol monoliths.",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondary
                         )
@@ -397,7 +397,7 @@ fun GamingActivityScreen(
                                 color = AccentBlue.copy(alpha = 0.15f)
                             ) {
                                 Text(
-                                    text = "HIGHWAY SIM",
+                                    text = "LANDSCAPE",
                                     color = AccentBlue,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
@@ -407,7 +407,7 @@ fun GamingActivityScreen(
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Highway driving simulation with oncoming traffic, lane changes, continuous steering wheel rotation, acceleration, and braking.",
+                            text = "Highway driving simulation in horizontal landscape orientation with oncoming traffic, lane changes, interactive steering wheel, and dual floor pedals.",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondary
                         )
@@ -430,18 +430,120 @@ fun GamingActivityScreen(
 }
 
 /**
- * Runner Obstacle Model
+ * Runner Obstacle Model for Temple Run–Style 3D Experience
  */
-enum class RunnerObstacleType { JUMP_HURDLE, SLIDE_ARCH, DODGE_ROADBLOCK }
+enum class RunnerObstacleType {
+    JUMP_HURDLE,      // Fallen Ancient Mossy Tree Trunk / Log -> Avoided by JUMP
+    SLIDE_ARCH,       // Ancient Ruined Stone Archway / Beam -> Avoided by SLIDE
+    DODGE_ROADBLOCK   // Giant Carved Totem Idol / Massive Boulder -> Avoided ONLY by changing lanes
+}
 
 data class RunnerObstacle(
     val obstacleId: Int,
     val lane: Int, // 0=Left, 1=Center, 2=Right
     val type: RunnerObstacleType,
-    var depth: Float, // 0.0 (horizon) to 1.0 (player)
-    val onsetElapsedRealtime: Long,
-    var evaluated: Boolean = false
+    var depth: Float = 0.0f, // 0.0 (horizon) to 1.0 (player position)
+    val onsetElapsedRealtime: Long = 0L,
+    var evaluated: Boolean = false,
+    var hasCollided: Boolean = false,
+    var isAvoided: Boolean = false
 )
+
+enum class RunnerActionState {
+    RUNNING,
+    JUMPING,
+    SLIDING
+}
+
+data class RunnerCollisionResult(
+    val hasCollided: Boolean,
+    val isAvoided: Boolean,
+    val reason: String
+)
+
+/**
+ * Deterministic Logical Collision Engine for Runner Gameplay.
+ * Solves the lane-separation false injury bug:
+ * 1. Checks depth collision window [0.82f, 0.98f].
+ * 2. Checks lateral lane clearance (|displayLane - obstacleLane| < 0.45f).
+ * 3. Never produces collisions for obstacles in different lanes!
+ * 4. Checks action state against obstacle category (jump avoids low hurdle, slide avoids overhead arch).
+ */
+object RunnerCollisionEngine {
+    const val COLLISION_ZONE_START = 0.82f
+    const val COLLISION_ZONE_END = 0.98f
+    const val LATERAL_LANE_THRESHOLD = 0.45f
+
+    fun evaluate(
+        playerDisplayLane: Float,
+        playerState: RunnerActionState,
+        obstacle: RunnerObstacle
+    ): RunnerCollisionResult {
+        // 1. Outside depth collision zone: no interaction yet or passed
+        if (obstacle.depth < COLLISION_ZONE_START || obstacle.depth > COLLISION_ZONE_END) {
+            return RunnerCollisionResult(
+                hasCollided = false,
+                isAvoided = false,
+                reason = "Outside depth collision zone (depth=${obstacle.depth})"
+            )
+        }
+
+        // 2. Lateral lane clearance: check if player is in the obstacle's lane
+        val lateralDist = abs(playerDisplayLane - obstacle.lane.toFloat())
+        val inSameLane = lateralDist < LATERAL_LANE_THRESHOLD
+
+        if (!inSameLane) {
+            // Player is in a different lane: SAFE PASS, ZERO COLLISION!
+            return RunnerCollisionResult(
+                hasCollided = false,
+                isAvoided = true,
+                reason = "Safe pass: player in lane $playerDisplayLane, obstacle in lane ${obstacle.lane}"
+            )
+        }
+
+        // 3. Same lane & within collision depth zone: evaluate by obstacle type and action state
+        return when (obstacle.type) {
+            RunnerObstacleType.JUMP_HURDLE -> {
+                if (playerState == RunnerActionState.JUMPING) {
+                    RunnerCollisionResult(
+                        hasCollided = false,
+                        isAvoided = true,
+                        reason = "Jumped over low hurdle"
+                    )
+                } else {
+                    RunnerCollisionResult(
+                        hasCollided = true,
+                        isAvoided = false,
+                        reason = "Hit low hurdle (action: $playerState)"
+                    )
+                }
+            }
+            RunnerObstacleType.SLIDE_ARCH -> {
+                if (playerState == RunnerActionState.SLIDING) {
+                    RunnerCollisionResult(
+                        hasCollided = false,
+                        isAvoided = true,
+                        reason = "Slid under overhead arch"
+                    )
+                } else {
+                    RunnerCollisionResult(
+                        hasCollided = true,
+                        isAvoided = false,
+                        reason = "Hit overhead arch (action: $playerState)"
+                    )
+                }
+            }
+            RunnerObstacleType.DODGE_ROADBLOCK -> {
+                // Giant totem / boulder blocks entire lane; neither jump nor slide clears it
+                RunnerCollisionResult(
+                    hasCollided = true,
+                    isAvoided = false,
+                    reason = "Crashed into lane-blocking boulder/totem"
+                )
+            }
+        }
+    }
+}
 
 /**
  * 1. PORTRAIT RUNNER GAME VIEW
@@ -469,6 +571,20 @@ private fun PortraitRunnerGameView(
     onActivityCompleted: () -> Unit,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
+    DisposableEffect(Unit) {
+        val activity = context as? Activity
+        val originalOrientation = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        onDispose {
+            activity?.requestedOrientation = originalOrientation
+        }
+    }
+
+    BackHandler {
+        onBack()
+    }
+
     var playerLane by remember { mutableIntStateOf(1) } // 0=Left, 1=Center, 2=Right
     var playerDisplayLane by remember { mutableFloatStateOf(1f) } // Smooth lerp between lanes
     var isJumping by remember { mutableStateOf(false) }
@@ -494,6 +610,21 @@ private fun PortraitRunnerGameView(
     var pendingDetectedAction by remember { mutableStateOf<String?>(null) }
     var roadScrollOffset by remember { mutableFloatStateOf(0f) }
     var runCycle by remember { mutableFloatStateOf(0f) }
+
+    // Cleanly reset state when starting an official trial or new attempt
+    LaunchedEffect(trialAttemptId) {
+        obstacles.clear()
+        collisionFlash = false
+        score = 0
+        obstaclesEncountered = 0
+        obstaclesAvoided = 0
+        collisionsCount = 0
+        totalLatencySum = 0L
+        latencyEventsCount = 0
+        actionsCount = 0
+        pendingReactionTime = 0L
+        pendingDetectedAction = null
+    }
 
     // Jump Animation Coroutine
     LaunchedEffect(isJumping) {
@@ -578,33 +709,27 @@ private fun PortraitRunnerGameView(
                 obs.depth += 0.022f // Smooth forward motion
 
                 // Collision evaluation zone: depth in [0.82, 0.98]
-                if (obs.depth >= 0.82f && !obs.evaluated) {
+                if (obs.depth >= RunnerCollisionEngine.COLLISION_ZONE_START && !obs.evaluated) {
                     obs.evaluated = true
                     obstaclesEncountered++
 
-                    val inSameLane = (playerLane == obs.lane)
-                    val expectedAction: String
-                    val matched: Boolean
+                    val playerState = when {
+                        isJumping -> RunnerActionState.JUMPING
+                        isSliding -> RunnerActionState.SLIDING
+                        else -> RunnerActionState.RUNNING
+                    }
 
-                    when (obs.type) {
-                        RunnerObstacleType.JUMP_HURDLE -> {
-                            expectedAction = "jump"
-                            matched = inSameLane && isJumping
-                        }
-                        RunnerObstacleType.SLIDE_ARCH -> {
-                            expectedAction = "roll"
-                            matched = inSameLane && isSliding
-                        }
-                        RunnerObstacleType.DODGE_ROADBLOCK -> {
-                            expectedAction = "swipe_dodge"
-                            matched = !inSameLane // Avoided if player is not in roadblock lane
-                        }
+                    val eval = RunnerCollisionEngine.evaluate(playerDisplayLane, playerState, obs)
+                    val expectedAction = when (obs.type) {
+                        RunnerObstacleType.JUMP_HURDLE -> "jump"
+                        RunnerObstacleType.SLIDE_ARCH -> "roll"
+                        RunnerObstacleType.DODGE_ROADBLOCK -> "swipe_dodge"
                     }
 
                     val qualifyingResponseTime = pendingReactionTime
                     val latency = if (qualifyingResponseTime > 0L && qualifyingResponseTime >= obs.onsetElapsedRealtime) {
                         (qualifyingResponseTime - obs.onsetElapsedRealtime).coerceIn(40L, 1600L)
-                    } else if (matched) {
+                    } else if (!eval.hasCollided) {
                         (now - obs.onsetElapsedRealtime).coerceIn(100L, 1600L)
                     } else {
                         -1L
@@ -618,36 +743,49 @@ private fun PortraitRunnerGameView(
                     val detectedStr = pendingDetectedAction ?: when {
                         isJumping -> "jump"
                         isSliding -> "roll"
-                        inSameLane -> "none"
+                        eval.hasCollided -> "none"
                         else -> "swipe_dodge"
                     }
 
-                    val resultStr = if (matched) "successful" else "collision"
-                    if (matched) {
-                        obstaclesAvoided++
-                        score += 30
-                        statusText = "✓ Avoided ${obs.type.name.replace('_', ' ')}!"
-                    } else {
+                    if (eval.hasCollided) {
+                        obs.hasCollided = true
                         collisionsCount++
                         score = (score - 10).coerceAtLeast(0)
-                        collisionFlash = true
-                        statusText = "💥 Collision with ${obs.type.name.replace('_', ' ')}!"
-                    }
+                        collisionFlash = true // RED FLASH ONLY ON GENUINE CONFIRMED COLLISION!
+                        statusText = "💥 Collision: ${eval.reason}"
 
-                    if (!isPractice) {
-                        onLogEvent(
-                            expectedAction,
-                            detectedStr,
-                            resultStr,
-                            trialAttemptId,
-                            latency,
-                            "obstacleId=${obs.obstacleId},lane=${obs.lane},playerLane=$playerLane,type=${obs.type}"
-                        )
+                        if (!isPractice) {
+                            onLogEvent(
+                                expectedAction,
+                                detectedStr,
+                                "collision",
+                                trialAttemptId,
+                                -1L,
+                                "obstacleId=${obs.obstacleId},lane=${obs.lane},playerLane=$playerLane,type=${obs.type}"
+                            )
+                        }
+                    } else {
+                        obs.isAvoided = true
+                        obstaclesAvoided++
+                        score += 30
+                        collisionFlash = false // NEVER SHOW FLASH ON AVOIDANCE OR DIFFERENT LANE!
+                        statusText = "✓ Avoided: ${eval.reason}"
+
+                        if (!isPractice) {
+                            onLogEvent(
+                                expectedAction,
+                                detectedStr,
+                                "successful",
+                                trialAttemptId,
+                                latency,
+                                "obstacleId=${obs.obstacleId},lane=${obs.lane},playerLane=$playerLane,type=${obs.type}"
+                            )
+                        }
                     }
 
                     pendingReactionTime = 0L
                     pendingDetectedAction = null
-                } else if (obs.depth > 1.15f) {
+                } else if (obs.depth > 1.20f) {
                     iterator.remove()
                 }
             }
@@ -771,13 +909,13 @@ private fun PortraitRunnerGameView(
             val width = size.width
             val height = size.height
 
-            val horizonY = height * 0.22f
+            val horizonY = height * 0.28f
             val bottomY = height
 
-            // 1. SKY GRADIENT (Cyber Midnight to Deep Violet)
+            // 1. SKY GRADIENT (Ancient Tropical Dusk - Amber Gold to Deep Jungle)
             drawRect(
                 brush = Brush.verticalGradient(
-                    colors = listOf(Color(0xFF030611), Color(0xFF0F172A), Color(0xFF1E1B4B)),
+                    colors = listOf(Color(0xFF0F172A), Color(0xFF1B4332), Color(0xFF2D6A4F), Color(0xFFB45309)),
                     startY = 0f,
                     endY = horizonY
                 ),
@@ -785,61 +923,92 @@ private fun PortraitRunnerGameView(
                 size = Size(width, horizonY)
             )
 
-            // Skyline Silhouettes on Horizon
-            val buildingCount = 14
-            for (b in 0 until buildingCount) {
-                val bW = width / buildingCount.toFloat()
-                val bH = 25f + ((b * 19) % 55)
-                drawRect(
-                    color = Color(0xFF0A0F24),
-                    topLeft = Offset(b * bW, horizonY - bH),
-                    size = Size(bW * 0.90f, bH)
-                )
-                // Illuminated Windows
-                drawCircle(
-                    color = if (b % 2 == 0) Color(0xFF38BDF8).copy(alpha = 0.6f) else Color(0xFFFDE047).copy(alpha = 0.5f),
-                    radius = 1.5f,
-                    center = Offset(b * bW + bW * 0.45f, horizonY - bH * 0.6f)
+            // Distant Ancient Stepped Mayan/Temple Pyramids
+            val pyramidBaseY = horizonY
+            // Left Pyramid
+            val p1X = width * 0.22f
+            for (step in 0..4) {
+                val stepW = 90f - step * 16f
+                val stepH = 9f
+                val stepY = pyramidBaseY - (step + 1) * stepH
+                drawRoundRect(
+                    color = Color(0xFF1E293B),
+                    topLeft = Offset(p1X - stepW / 2f, stepY),
+                    size = Size(stepW, stepH),
+                    cornerRadius = CornerRadius(2f, 2f)
                 )
             }
-
-            // Neon Horizon Laser Beam
-            drawLine(
-                color = AccentTeal.copy(alpha = 0.85f),
-                start = Offset(0f, horizonY),
-                end = Offset(width, horizonY),
-                strokeWidth = 3f
+            // Center-Right Majestic Pyramid
+            val p2X = width * 0.70f
+            for (step in 0..6) {
+                val stepW = 140f - step * 18f
+                val stepH = 10f
+                val stepY = pyramidBaseY - (step + 1) * stepH
+                drawRoundRect(
+                    color = Color(0xFF0F172A),
+                    topLeft = Offset(p2X - stepW / 2f, stepY),
+                    size = Size(stepW, stepH),
+                    cornerRadius = CornerRadius(2f, 2f)
+                )
+            }
+            // Temple Capstone Sun Glow
+            drawCircle(
+                color = Color(0xFFFDE047).copy(alpha = 0.45f),
+                radius = 12f,
+                center = Offset(p2X, pyramidBaseY - 70f)
             )
 
-            // 2. TERRAIN / FLANKING GROUND
+            // 2. FLANKING JUNGLE CANOPY & VEGETATION GROUND
             drawRect(
-                color = Color(0xFF0A1020),
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color(0xFF064E3B), Color(0xFF022C22)),
+                    startY = horizonY,
+                    endY = bottomY
+                ),
                 topLeft = Offset(0f, horizonY),
                 size = Size(width, bottomY - horizonY)
             )
 
-            // Gridlines on flanking terrain
-            for (g in 1..6) {
-                val depth = g * 0.16f
-                val y = horizonY + (bottomY - horizonY) * depth
-                drawLine(
-                    color = Color(0xFF1E293B).copy(alpha = 0.45f),
-                    start = Offset(0f, y),
-                    end = Offset(width, y),
-                    strokeWidth = 1f
+            // Weathered Ancient Stone Steles / Pillars Flanking Track Edges
+            for (pIdx in 0..5) {
+                val depth = (pIdx * 0.18f + roadScrollOffset * 0.18f) % 1.0f
+                val py = horizonY + (bottomY - horizonY) * depth
+                val pScale = 0.25f + depth * 0.75f
+                val pillarW = 20f * pScale
+                val pillarH = 75f * pScale
+
+                // Left flanking totem
+                val lx = 20f + (width * 0.10f) * depth
+                drawRoundRect(
+                    color = Color(0xFF334155),
+                    topLeft = Offset(lx - pillarW / 2f, py - pillarH),
+                    size = Size(pillarW, pillarH),
+                    cornerRadius = CornerRadius(3f, 3f)
                 )
+                // Vines / Moss
+                drawCircle(color = Color(0xFF22C55E), radius = 4f * pScale, center = Offset(lx, py - pillarH * 0.6f))
+
+                // Right flanking totem
+                val rx = width - 20f - (width * 0.10f) * depth
+                drawRoundRect(
+                    color = Color(0xFF334155),
+                    topLeft = Offset(rx - pillarW / 2f, py - pillarH),
+                    size = Size(pillarW, pillarH),
+                    cornerRadius = CornerRadius(3f, 3f)
+                )
+                drawCircle(color = Color(0xFF22C55E), radius = 4f * pScale, center = Offset(rx, py - pillarH * 0.6f))
             }
 
-            // 3. TRACK GEOMETRY (Extremely expansive, filling 94% of bottom width!)
-            val bottomRoadWidth = width * 0.94f
-            val horizonRoadWidth = width * 0.28f
+            // 3. ANCIENT STONE-PAVED RUNNING TRACK (Expansive 3D Perspective)
+            val bottomRoadWidth = width * 0.92f
+            val horizonRoadWidth = width * 0.24f
 
             val leftBottomX = (width - bottomRoadWidth) / 2f
             val rightBottomX = leftBottomX + bottomRoadWidth
             val leftHorizonX = (width - horizonRoadWidth) / 2f
             val rightHorizonX = leftHorizonX + horizonRoadWidth
 
-            // Deep Carbon Asphalt Surface
+            // Main Stone Flagstone Surface
             val trackPath = Path().apply {
                 moveTo(leftHorizonX, horizonY)
                 lineTo(rightHorizonX, horizonY)
@@ -850,69 +1019,90 @@ private fun PortraitRunnerGameView(
             drawPath(
                 path = trackPath,
                 brush = Brush.verticalGradient(
-                    colors = listOf(Color(0xFF0B1222), Color(0xFF0F172A), Color(0xFF131D33)),
+                    colors = listOf(Color(0xFF262626), Color(0xFF1E242B), Color(0xFF171B21)),
                     startY = horizonY,
                     endY = bottomY
                 )
             )
 
-            // High-Tech Outer Glowing Laser Rails
-            drawLine(
-                color = AccentTeal,
-                start = Offset(leftHorizonX, horizonY),
-                end = Offset(leftBottomX, bottomY),
-                strokeWidth = 5f
-            )
-            drawLine(
-                color = AccentTeal.copy(alpha = 0.4f),
-                start = Offset(leftHorizonX - 4f, horizonY),
-                end = Offset(leftBottomX - 6f, bottomY),
-                strokeWidth = 10f
-            )
+            // Ancient Mossy Curbstones Along Track Edges
+            val curbSegments = 10
+            for (c in 0 until curbSegments) {
+                val d1 = (c.toFloat() / curbSegments + roadScrollOffset * (1f / curbSegments)) % 1.0f
+                val d2 = (d1 + 0.8f / curbSegments).coerceAtMost(1.0f)
+                if (d2 > d1) {
+                    val y1 = horizonY + (bottomY - horizonY) * d1
+                    val y2 = horizonY + (bottomY - horizonY) * d2
+                    val cw1 = 8f + d1 * 18f
+                    val cw2 = 8f + d2 * 18f
 
-            drawLine(
-                color = AccentTeal,
-                start = Offset(rightHorizonX, horizonY),
-                end = Offset(rightBottomX, bottomY),
-                strokeWidth = 5f
-            )
-            drawLine(
-                color = AccentTeal.copy(alpha = 0.4f),
-                start = Offset(rightHorizonX + 4f, horizonY),
-                end = Offset(rightBottomX + 6f, bottomY),
-                strokeWidth = 10f
-            )
+                    val lx1 = leftHorizonX + (leftBottomX - leftHorizonX) * d1
+                    val lx2 = leftHorizonX + (leftBottomX - leftHorizonX) * d2
+                    val rx1 = rightHorizonX + (rightBottomX - rightHorizonX) * d1
+                    val rx2 = rightHorizonX + (rightBottomX - rightHorizonX) * d2
 
-            // 4. ANIMATED SPEED CHEVRONS ON TRACK
-            for (i in 0..5) {
-                val lineDepth = (i * 0.18f + roadScrollOffset * 0.18f) % 1.0f
+                    val mossColor = if (c % 2 == 0) Color(0xFF166534) else Color(0xFF334155)
+
+                    // Left curb block
+                    val lCurb = Path().apply {
+                        moveTo(lx1 - cw1, y1)
+                        lineTo(lx1, y1)
+                        lineTo(lx2, y2)
+                        lineTo(lx2 - cw2, y2)
+                        close()
+                    }
+                    drawPath(lCurb, mossColor)
+
+                    // Right curb block
+                    val rCurb = Path().apply {
+                        moveTo(rx1, y1)
+                        lineTo(rx1 + cw1, y1)
+                        lineTo(rx2 + cw2, y2)
+                        lineTo(rx2, y2)
+                        close()
+                    }
+                    drawPath(rCurb, mossColor)
+                }
+            }
+
+            // Horizontal Flagstone Grooves (Forward Scrolling Ancient Pavers)
+            for (i in 0..8) {
+                val lineDepth = (i * 0.12f + roadScrollOffset * 0.12f) % 1.0f
                 val lineY = horizonY + (bottomY - horizonY) * lineDepth
                 val currentW = horizonRoadWidth + (bottomRoadWidth - horizonRoadWidth) * lineDepth
                 val leftX = (width - currentW) / 2f
 
                 drawLine(
-                    color = AccentBlue.copy(alpha = 0.15f + lineDepth * 0.35f),
+                    color = Color(0xFF0F172A).copy(alpha = 0.70f),
                     start = Offset(leftX, lineY),
                     end = Offset(leftX + currentW, lineY),
-                    strokeWidth = 2f + lineDepth * 5f
+                    strokeWidth = 2f + lineDepth * 4.5f
                 )
             }
 
-            // 5. 3 LANES DIVIDERS WITH GLOWING CYAN PULSES
+            // 4. THREE PLAYABLE LANES (Separated by Carved Stone Grooves & Ancient Golden Runic Lines)
             for (laneDiv in 1..2) {
                 val topX = leftHorizonX + (horizonRoadWidth / 3f) * laneDiv
                 val botX = leftBottomX + (bottomRoadWidth / 3f) * laneDiv
 
-                // Dashed Animated Lane Lines
-                for (dashIdx in 0..7) {
-                    val depth = (dashIdx * 0.14f + roadScrollOffset * 0.14f) % 1.0f
+                // Continuous Ancient Carved Stone Groove
+                drawLine(
+                    color = Color(0xFF0A0F1D),
+                    start = Offset(topX, horizonY),
+                    end = Offset(botX, bottomY),
+                    strokeWidth = 4f
+                )
+
+                // Glowing Golden Amber Rune Markers
+                for (dashIdx in 0..6) {
+                    val depth = (dashIdx * 0.15f + roadScrollOffset * 0.15f) % 1.0f
                     val dashY = horizonY + (bottomY - horizonY) * depth
                     val dashX = topX + (botX - topX) * depth
-                    val dashH = 12f + depth * 32f
-                    val dashW = 2.5f + depth * 4.5f
+                    val dashH = 14f + depth * 35f
+                    val dashW = 3f + depth * 5.5f
 
                     drawRoundRect(
-                        color = AccentTeal.copy(alpha = 0.4f + depth * 0.5f),
+                        color = Color(0xFFF59E0B).copy(alpha = 0.5f + depth * 0.45f),
                         topLeft = Offset(dashX - dashW / 2f, dashY),
                         size = Size(dashW, dashH),
                         cornerRadius = CornerRadius(2f, 2f)
@@ -920,7 +1110,7 @@ private fun PortraitRunnerGameView(
                 }
             }
 
-            // 6. DETAILED 3D-PERSPECTIVE OBSTACLES
+            // 5. SUBSTANTIAL, RECOGNIZABLE TEMPLE RUN OBSTACLES (3D Perspective Scaling)
             for (obs in obstacles) {
                 val obsY = horizonY + (bottomY - horizonY) * obs.depth
                 val currentRoadW = horizonRoadWidth + (bottomRoadWidth - horizonRoadWidth) * obs.depth
@@ -928,158 +1118,195 @@ private fun PortraitRunnerGameView(
                 val laneW = currentRoadW / 3f
                 val obsCenterX = currentLeftX + laneW * obs.lane + (laneW / 2f)
 
-                val obsBaseW = laneW * 0.85f
-                val obsScale = 0.35f + obs.depth * 0.65f
+                val obsBaseW = laneW * 0.88f
+                val obsScale = 0.22f + obs.depth * 0.78f // Smooth 3D growth
 
                 when (obs.type) {
                     RunnerObstacleType.JUMP_HURDLE -> {
-                        // High-Tech Laser Hurdle (Dual metallic pylons + horizontal plasma laser barrier)
-                        val hurdleH = 46f * obsScale
-                        val pylonW = 14f * obsScale
+                        // ==========================================
+                        // 1. FALLEN MOSSY ANCIENT TREE TRUNK / LOG
+                        // Clear low hurdle: Jump over!
+                        // ==========================================
+                        val logH = 34f * obsScale
+                        val logW = obsBaseW
 
-                        // Left & Right Metallic Pylons
-                        drawRoundRect(
-                            color = Color(0xFF334155),
-                            topLeft = Offset(obsCenterX - obsBaseW / 2f, obsY - hurdleH),
-                            size = Size(pylonW, hurdleH),
-                            cornerRadius = CornerRadius(3f, 3f)
-                        )
-                        drawRoundRect(
-                            color = Color(0xFF334155),
-                            topLeft = Offset(obsCenterX + obsBaseW / 2f - pylonW, obsY - hurdleH),
-                            size = Size(pylonW, hurdleH),
-                            cornerRadius = CornerRadius(3f, 3f)
+                        // Drop Shadow on Flagstones
+                        drawOval(
+                            color = Color.Black.copy(alpha = 0.55f),
+                            topLeft = Offset(obsCenterX - logW * 0.52f, obsY - logH * 0.2f),
+                            size = Size(logW * 1.04f, 16f * obsScale)
                         )
 
-                        // Red/Orange Hazard Strobes on Pylon Tops
-                        drawCircle(
-                            color = StatusError,
-                            radius = 5f * obsScale,
-                            center = Offset(obsCenterX - obsBaseW / 2f + pylonW / 2f, obsY - hurdleH)
-                        )
-                        drawCircle(
-                            color = StatusError,
-                            radius = 5f * obsScale,
-                            center = Offset(obsCenterX + obsBaseW / 2f - pylonW / 2f, obsY - hurdleH)
-                        )
-
-                        // Horizontal Plasma Energy Beam
-                        val beamY = obsY - hurdleH * 0.55f
-                        val beamThickness = 12f * obsScale
+                        // Main Cylindrical Tree Trunk (Deep bark brown)
                         drawRoundRect(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(Color(0xFFEF4444), Color(0xFFF97316), Color(0xFFEF4444))
+                            brush = Brush.verticalGradient(
+                                colors = listOf(Color(0xFF5C4033), Color(0xFF382315), Color(0xFF26180E))
                             ),
-                            topLeft = Offset(obsCenterX - obsBaseW / 2f + pylonW * 0.8f, beamY - beamThickness / 2f),
-                            size = Size(obsBaseW - pylonW * 1.6f, beamThickness),
-                            cornerRadius = CornerRadius(4f, 4f)
+                            topLeft = Offset(obsCenterX - logW / 2f, obsY - logH),
+                            size = Size(logW, logH),
+                            cornerRadius = CornerRadius(8f * obsScale, 8f * obsScale)
                         )
-                        // Brilliant White Core Plasma Wire
-                        drawLine(
-                            color = Color.White,
-                            start = Offset(obsCenterX - obsBaseW * 0.42f, beamY),
-                            end = Offset(obsCenterX + obsBaseW * 0.42f, beamY),
-                            strokeWidth = 3f * obsScale
+
+                        // Left and Right Cut Ends (Concentric Growth Rings)
+                        val endW = 12f * obsScale
+                        drawOval(
+                            color = Color(0xFF8D6E63),
+                            topLeft = Offset(obsCenterX - logW / 2f, obsY - logH),
+                            size = Size(endW, logH)
                         )
+                        drawOval(
+                            color = Color(0xFF5D4037),
+                            topLeft = Offset(obsCenterX - logW / 2f + 2f, obsY - logH + 4f),
+                            size = Size(endW * 0.65f, logH - 8f)
+                        )
+                        drawOval(
+                            color = Color(0xFF8D6E63),
+                            topLeft = Offset(obsCenterX + logW / 2f - endW, obsY - logH),
+                            size = Size(endW, logH)
+                        )
+
+                        // Lush Green Moss Patches & Ferns on Top
+                        val mossCount = 4
+                        for (m in 0 until mossCount) {
+                            val mx = obsCenterX - logW * 0.35f + m * (logW * 0.22f)
+                            drawOval(
+                                color = Color(0xFF22C55E),
+                                topLeft = Offset(mx, obsY - logH - 4f * obsScale),
+                                size = Size(20f * obsScale, 8f * obsScale)
+                            )
+                        }
                     }
 
                     RunnerObstacleType.SLIDE_ARCH -> {
-                        // Heavy Overhead Laser Archway (Must slide under!)
-                        val archTotalH = 110f * obsScale
-                        val legW = 16f * obsScale
-                        val beamH = 34f * obsScale
+                        // ==========================================
+                        // 2. ANCIENT RUINED STONE ARCHWAY / BEAM
+                        // Overhead obstacle: Slide under!
+                        // ==========================================
+                        val archTotalH = 125f * obsScale
+                        val pillarW = 20f * obsScale
+                        val beamH = 36f * obsScale
+                        val archW = obsBaseW
 
-                        // Left and right heavy pillars
+                        // Pillar Ground Shadows
+                        drawOval(color = Color.Black.copy(alpha = 0.50f), topLeft = Offset(obsCenterX - archW / 2f - 4f, obsY - 6f), size = Size(pillarW + 8f, 14f * obsScale))
+                        drawOval(color = Color.Black.copy(alpha = 0.50f), topLeft = Offset(obsCenterX + archW / 2f - pillarW - 4f, obsY - 6f), size = Size(pillarW + 8f, 14f * obsScale))
+
+                        // Left Carved Stone Pillar
                         drawRoundRect(
-                            color = Color(0xFF1E293B),
-                            topLeft = Offset(obsCenterX - obsBaseW / 2f, obsY - archTotalH),
-                            size = Size(legW, archTotalH),
+                            brush = Brush.horizontalGradient(listOf(Color(0xFF475569), Color(0xFF1E293B))),
+                            topLeft = Offset(obsCenterX - archW / 2f, obsY - archTotalH),
+                            size = Size(pillarW, archTotalH),
                             cornerRadius = CornerRadius(4f, 4f)
                         )
+                        // Right Carved Stone Pillar
                         drawRoundRect(
-                            color = Color(0xFF1E293B),
-                            topLeft = Offset(obsCenterX + obsBaseW / 2f - legW, obsY - archTotalH),
-                            size = Size(legW, archTotalH),
+                            brush = Brush.horizontalGradient(listOf(Color(0xFF1E293B), Color(0xFF475569))),
+                            topLeft = Offset(obsCenterX + archW / 2f - pillarW, obsY - archTotalH),
+                            size = Size(pillarW, archTotalH),
                             cornerRadius = CornerRadius(4f, 4f)
                         )
 
-                        // Top Overhead Crossbeam with Caution Stripes
+                        // Heavy Stone Overhead Lintel Beam
                         drawRoundRect(
-                            color = Color(0xFFCA8A04),
-                            topLeft = Offset(obsCenterX - obsBaseW / 2f, obsY - archTotalH),
-                            size = Size(obsBaseW, beamH),
-                            cornerRadius = CornerRadius(4f, 4f)
+                            brush = Brush.verticalGradient(listOf(Color(0xFF64748B), Color(0xFF334155))),
+                            topLeft = Offset(obsCenterX - archW / 2f - 4f, obsY - archTotalH),
+                            size = Size(archW + 8f, beamH),
+                            cornerRadius = CornerRadius(6f * obsScale, 6f * obsScale)
                         )
-                        // Diagonal Caution Markings on Beam
-                        val stripeCount = 5
-                        for (s in 0 until stripeCount) {
-                            val sx = obsCenterX - obsBaseW / 2f + (s * (obsBaseW / stripeCount))
-                            drawLine(
-                                color = Color(0xFF0F172A),
-                                start = Offset(sx, obsY - archTotalH + beamH),
-                                end = Offset(sx + 15f * obsScale, obsY - archTotalH),
-                                strokeWidth = 4f * obsScale
+
+                        // Inscribed Glowing Mayan Glyphs along Beam
+                        for (g in 0..3) {
+                            val gx = obsCenterX - archW * 0.30f + g * (archW * 0.20f)
+                            drawRoundRect(
+                                color = Color(0xFFF59E0B).copy(alpha = 0.85f),
+                                topLeft = Offset(gx, obsY - archTotalH + beamH * 0.30f),
+                                size = Size(14f * obsScale, 14f * obsScale),
+                                cornerRadius = CornerRadius(2f, 2f)
                             )
                         }
 
-                        // Low-hanging Amber/Red Laser Grid
-                        val laserY1 = obsY - archTotalH + beamH + 6f
-                        val laserY2 = obsY - archTotalH * 0.45f
-                        drawLine(
-                            color = Color(0xFFEF4444).copy(alpha = 0.85f),
-                            start = Offset(obsCenterX - obsBaseW * 0.42f, laserY1),
-                            end = Offset(obsCenterX + obsBaseW * 0.42f, laserY1),
-                            strokeWidth = 3f * obsScale
-                        )
-                        drawLine(
-                            color = Color(0xFFF59E0B).copy(alpha = 0.85f),
-                            start = Offset(obsCenterX - obsBaseW * 0.42f, laserY2),
-                            end = Offset(obsCenterX + obsBaseW * 0.42f, laserY2),
-                            strokeWidth = 3f * obsScale
-                        )
+                        // Hanging Jungle Vines and Roots
+                        for (v in 0..4) {
+                            val vx = obsCenterX - archW * 0.36f + v * (archW * 0.18f)
+                            val vineLen = (18f + ((v * 7) % 24)) * obsScale
+                            drawLine(
+                                color = Color(0xFF16A34A),
+                                start = Offset(vx, obsY - archTotalH + beamH),
+                                end = Offset(vx + (if (v % 2 == 0) 3f else -3f), obsY - archTotalH + beamH + vineLen),
+                                strokeWidth = 3f * obsScale,
+                                cap = StrokeCap.Round
+                            )
+                        }
                     }
 
                     RunnerObstacleType.DODGE_ROADBLOCK -> {
-                        // High-Security Ballistic Roadblock (Blocks full lane!)
-                        val barrierH = 75f * obsScale
-                        // Concrete / Carbon Base Block
-                        drawRoundRect(
-                            color = Color(0xFF1E293B),
-                            topLeft = Offset(obsCenterX - obsBaseW / 2f, obsY - barrierH),
-                            size = Size(obsBaseW, barrierH),
-                            cornerRadius = CornerRadius(6f, 6f)
+                        // ==========================================
+                        // 3. GIANT CARVED ANCIENT IDOL TOTEM / BOULDER
+                        // Complete Lane Blocker: Swipe Left/Right to dodge!
+                        // ==========================================
+                        val totemH = 130f * obsScale
+                        val totemW = obsBaseW
+
+                        // Massive Ground Shadow
+                        drawOval(
+                            color = Color.Black.copy(alpha = 0.65f),
+                            topLeft = Offset(obsCenterX - totemW * 0.55f, obsY - 10f),
+                            size = Size(totemW * 1.10f, 20f * obsScale)
                         )
 
-                        // Bold Hazard Diagonal Chevrons
+                        // Weathered Monolithic Stone Body
                         drawRoundRect(
-                            color = Color(0xFFEA580C),
-                            topLeft = Offset(obsCenterX - obsBaseW * 0.46f, obsY - barrierH * 0.85f),
-                            size = Size(obsBaseW * 0.92f, barrierH * 0.70f),
-                            cornerRadius = CornerRadius(4f, 4f)
+                            brush = Brush.verticalGradient(
+                                colors = listOf(Color(0xFF475569), Color(0xFF334155), Color(0xFF1E293B))
+                            ),
+                            topLeft = Offset(obsCenterX - totemW / 2f, obsY - totemH),
+                            size = Size(totemW, totemH),
+                            cornerRadius = CornerRadius(10f * obsScale, 10f * obsScale)
                         )
-                        for (c in 0..4) {
-                            val cx = obsCenterX - obsBaseW * 0.42f + c * (obsBaseW * 0.20f)
-                            drawLine(
-                                color = Color(0xFF0F172A),
-                                start = Offset(cx, obsY - barrierH * 0.15f),
-                                end = Offset(cx + 18f * obsScale, obsY - barrierH * 0.85f),
-                                strokeWidth = 6f * obsScale
+
+                        // Ancient Carved Menacing Idol Face (Tiki / Mayan relief)
+                        val faceCenterY = obsY - totemH * 0.62f
+                        val eyeW = 16f * obsScale
+                        val eyeH = 10f * obsScale
+
+                        // Glowing Menacing Ruby Eyes
+                        drawOval(color = Color(0xFFDC2626), topLeft = Offset(obsCenterX - totemW * 0.28f - eyeW / 2f, faceCenterY - eyeH / 2f), size = Size(eyeW, eyeH))
+                        drawCircle(color = Color.White, radius = 2.5f * obsScale, center = Offset(obsCenterX - totemW * 0.28f, faceCenterY))
+
+                        drawOval(color = Color(0xFFDC2626), topLeft = Offset(obsCenterX + totemW * 0.28f - eyeW / 2f, faceCenterY - eyeH / 2f), size = Size(eyeW, eyeH))
+                        drawCircle(color = Color.White, radius = 2.5f * obsScale, center = Offset(obsCenterX + totemW * 0.28f, faceCenterY))
+
+                        // Carved Stone Mouth with Fangs
+                        val mouthW = totemW * 0.55f
+                        val mouthH = 16f * obsScale
+                        val mouthY = faceCenterY + 22f * obsScale
+                        drawRoundRect(
+                            color = Color(0xFF0F172A),
+                            topLeft = Offset(obsCenterX - mouthW / 2f, mouthY),
+                            size = Size(mouthW, mouthH),
+                            cornerRadius = CornerRadius(3f, 3f)
+                        )
+                        // Stone Teeth Fangs
+                        for (t in 0..3) {
+                            val tx = obsCenterX - mouthW * 0.35f + t * (mouthW * 0.24f)
+                            drawRect(
+                                color = Color(0xFFE2E8F0),
+                                topLeft = Offset(tx, mouthY),
+                                size = Size(5f * obsScale, 7f * obsScale)
                             )
                         }
 
-                        // Twin Flashing Strobe Beacons on Top Corners
-                        drawCircle(color = StatusError, radius = 6f * obsScale, center = Offset(obsCenterX - obsBaseW * 0.42f, obsY - barrierH))
-                        drawCircle(color = Color.White, radius = 2.5f * obsScale, center = Offset(obsCenterX - obsBaseW * 0.42f, obsY - barrierH))
-                        drawCircle(color = StatusError, radius = 6f * obsScale, center = Offset(obsCenterX + obsBaseW * 0.42f, obsY - barrierH))
-                        drawCircle(color = Color.White, radius = 2.5f * obsScale, center = Offset(obsCenterX + obsBaseW * 0.42f, obsY - barrierH))
+                        // Creeping Moss & Deep Stone Fissures
+                        drawCircle(color = Color(0xFF16A34A), radius = 12f * obsScale, center = Offset(obsCenterX - totemW * 0.36f, obsY - totemH * 0.20f))
+                        drawCircle(color = Color(0xFF16A34A), radius = 14f * obsScale, center = Offset(obsCenterX + totemW * 0.34f, obsY - totemH * 0.88f))
                     }
                 }
             }
 
-            // 7. HIGH-FIDELITY ANIMATED RUNNER CHARACTER
+            // 6. PROMINENT ARTICULATED ADVENTURER RUNNER (Third-Person View from Behind)
             val playerLaneW = bottomRoadWidth / 3f
             val playerCenterX = leftBottomX + playerLaneW * playerDisplayLane + (playerLaneW / 2f)
-            val playerBaseY = bottomY - 100f
+            val playerBaseY = bottomY - 110f
 
             drawRunnerCharacter(
                 scope = this,
@@ -1090,13 +1317,14 @@ private fun PortraitRunnerGameView(
                 isSliding = isSliding,
                 slideProgress = slideProgress,
                 runCycle = runCycle,
+                lateralLean = (playerDisplayLane - playerLane),
                 collisionFlash = collisionFlash
             )
 
-            // 8. COLLISION IMPACT VIGNETTE
+            // 7. COLLISION IMPACT VIGNETTE (Only triggers after genuine confirmed collision!)
             if (collisionFlash) {
                 drawRect(
-                    color = Color(0xFFDC2626).copy(alpha = 0.45f),
+                    color = Color(0xFFDC2626).copy(alpha = 0.50f),
                     topLeft = Offset(0f, 0f),
                     size = Size(width, height)
                 )
@@ -1367,8 +1595,16 @@ private fun PortraitRunnerGameView(
 }
 
 /**
- * Procedural Articulated 2D Runner Character Drawing
- * Renders head/visor, athletic torso, chest reactor, swinging arms, and running legs
+ * Procedural Articulated 3D Explorer Adventurer Runner Character Drawing
+ * Authentic Temple Run–inspired third-person adventurer viewed from behind:
+ * - Substantial size (185px height x 92px width) anchored in the foreground
+ * - Weathered leather expedition vest, khaki field shirt, and utility harness with brass buckles
+ * - Mounted canvas expedition backpack with top-lashed bedroll and utility canteen
+ * - Articulated muscular legs in olive safari cargo pants with reinforced knee pads
+ * - Rugged leather trekking boots with rubber tread soles
+ * - Dynamic ground shadow decoupled during leaps to provide authentic 3D depth
+ * - Athletic sliding pose tucked low to the pavement with friction dust
+ * - Lateral banking tilt during lane transitions
  */
 private fun drawRunnerCharacter(
     scope: DrawScope,
@@ -1379,236 +1615,334 @@ private fun drawRunnerCharacter(
     isSliding: Boolean,
     slideProgress: Float,
     runCycle: Float,
+    lateralLean: Float = 0f,
     collisionFlash: Boolean
 ) {
     with(scope) {
-        val characterHeight = 110f
-        val characterWidth = 68f
+        val characterHeight = 185f
+        val characterWidth = 92f
 
         // Stride dynamics
         val jumpHeight = if (isJumping) sin(jumpProgress * Math.PI.toFloat()) * 135f else 0f
-        val verticalBob = if (!isJumping && !isSliding) abs(sin(runCycle)) * 7f else 0f
-
+        val verticalBob = if (!isJumping && !isSliding) abs(sin(runCycle)) * 8f else 0f
         val currentY = baseY - jumpHeight - verticalBob
 
-        // 1. Dynamic Ground Shadow (Stays on the track even during jump!)
-        val shadowScale = if (isJumping) (1f - (jumpHeight / 160f) * 0.5f).coerceAtLeast(0.4f) else if (isSliding) 1.25f else 1.0f
-        val shadowAlpha = if (isJumping) 0.25f else 0.55f
+        // 1. Dynamic Ground Shadow (Remains anchored on the stone path track!)
+        val shadowScale = if (isJumping) {
+            (1f - (jumpHeight / 160f) * 0.55f).coerceAtLeast(0.35f)
+        } else if (isSliding) {
+            1.40f
+        } else {
+            1.05f
+        }
+        val shadowAlpha = if (isJumping) 0.28f else 0.58f
 
         drawOval(
             color = Color.Black.copy(alpha = shadowAlpha),
-            topLeft = Offset(centerX - (characterWidth * 0.55f) * shadowScale, baseY + 10f),
-            size = Size((characterWidth * 1.1f) * shadowScale, 18f * shadowScale)
+            topLeft = Offset(centerX - (characterWidth * 0.52f) * shadowScale, baseY + 10f),
+            size = Size((characterWidth * 1.04f) * shadowScale, 20f * shadowScale)
         )
 
-        val suitBaseColor = if (collisionFlash) StatusError else Color(0xFF0F172A)
-        val suitAccentColor = if (collisionFlash) Color(0xFFFCA5A5) else AccentTeal
-        val visorGlowColor = if (collisionFlash) Color.White else Color(0xFF38BDF8)
+        // Palette definitions
+        val vestColor = if (collisionFlash) Color(0xFFDC2626) else Color(0xFF78350F)
+        val vestDarkColor = if (collisionFlash) Color(0xFF991B1B) else Color(0xFF451A03)
+        val shirtColor = if (collisionFlash) Color(0xFFFCA5A5) else Color(0xFFD4A373)
+        val pantsColor = if (collisionFlash) Color(0xFFB91C1C) else Color(0xFF3F4D3C)
+        val bootsColor = if (collisionFlash) Color(0xFF7F1D1D) else Color(0xFF29180E)
+        val skinColor = if (collisionFlash) Color(0xFFF87171) else Color(0xFFD97706)
+        val backpackColor = if (collisionFlash) Color(0xFF991B1B) else Color(0xFF382315)
+        val bedrollColor = if (collisionFlash) Color(0xFFEF4444) else Color(0xFF1E3A1E)
+        val bandanaColor = if (collisionFlash) Color.White else Color(0xFFB91C1C)
 
-        if (isSliding) {
-            // ==========================================
-            // SLIDE POSE: Low, horizontal aerodynamic slide
-            // ==========================================
-            val slideW = characterWidth * 1.35f
-            val slideH = 34f
-            val slideY = baseY - slideH + 10f
+        // Banking tilt during lateral lane transition
+        val bankingAngle = (lateralLean.coerceIn(-1f, 1f)) * -7.5f
 
-            // Motion friction sparks along pavement
-            for (sp in 0..4) {
-                val spX = centerX - slideW / 2f - sp * 14f
-                val spY = baseY + 8f + (sp % 2) * 4f
-                drawCircle(color = Color(0xFFFDE047), radius = 2.5f, center = Offset(spX, spY))
-            }
+        rotate(degrees = bankingAngle, pivot = Offset(centerX, baseY)) {
+            if (isSliding) {
+                // ==========================================
+                // ATHLETIC LOW GROUND SLIDE POSE
+                // ==========================================
+                val slideW = characterWidth * 1.50f
+                val slideH = 44f
+                val slideY = baseY - slideH + 12f
 
-            // Torso & legs sliding flat
-            drawRoundRect(
-                brush = Brush.horizontalGradient(listOf(suitAccentColor, suitBaseColor)),
-                topLeft = Offset(centerX - slideW / 2f, slideY),
-                size = Size(slideW, slideH),
-                cornerRadius = CornerRadius(10f, 10f)
-            )
+                // Flagstone friction dust & sparks
+                for (sp in 0..5) {
+                    val spX = centerX - slideW / 2f - sp * 16f
+                    val spY = baseY + 8f + ((sp * 7) % 6)
+                    drawCircle(color = Color(0xFFFBBF24), radius = 3.5f, center = Offset(spX, spY))
+                    drawCircle(color = Color(0xFFE2E8F0).copy(alpha = 0.45f), radius = 6f, center = Offset(spX - 8f, spY - 2f))
+                }
 
-            // Sleek Cyber Helmet tucked low
-            drawRoundRect(
-                color = suitAccentColor,
-                topLeft = Offset(centerX + slideW * 0.18f, slideY + 4f),
-                size = Size(26f, 22f),
-                cornerRadius = CornerRadius(6f, 6f)
-            )
-            // Visor Slit
-            drawLine(
-                color = visorGlowColor,
-                start = Offset(centerX + slideW * 0.28f, slideY + 12f),
-                end = Offset(centerX + slideW * 0.42f, slideY + 12f),
-                strokeWidth = 4f,
-                cap = StrokeCap.Round
-            )
-        } else {
-            // ==========================================
-            // STANDING / RUNNING / JUMPING POSE
-            // ==========================================
-            val legSwing = if (isJumping) 0f else sin(runCycle) * 28f
-            val armSwing = if (isJumping) 0f else -sin(runCycle) * 32f
-
-            // Legs
-            val hipY = currentY - characterHeight * 0.40f
-            val footY = currentY
-
-            if (isJumping) {
-                // Tucked legs during leap
-                val tuckY = currentY - characterHeight * 0.18f
-                // Left leg tucked
+                // Extended Sliding Legs (Pants & Boots)
                 drawRoundRect(
-                    color = suitBaseColor,
-                    topLeft = Offset(centerX - 24f, hipY),
-                    size = Size(16f, tuckY - hipY),
+                    brush = Brush.horizontalGradient(listOf(bootsColor, pantsColor)),
+                    topLeft = Offset(centerX - slideW / 2f, slideY + 12f),
+                    size = Size(slideW * 0.65f, slideH * 0.65f),
+                    cornerRadius = CornerRadius(8f, 8f)
+                )
+                // Boot Sole
+                drawRoundRect(
+                    color = Color.Black,
+                    topLeft = Offset(centerX - slideW / 2f, slideY + 22f),
+                    size = Size(28f, 12f),
+                    cornerRadius = CornerRadius(4f, 4f)
+                )
+
+                // Torso & Weathered Vest Tucked Low
+                drawRoundRect(
+                    brush = Brush.horizontalGradient(listOf(vestDarkColor, vestColor)),
+                    topLeft = Offset(centerX - slideW * 0.12f, slideY),
+                    size = Size(slideW * 0.55f, slideH),
+                    cornerRadius = CornerRadius(12f, 12f)
+                )
+
+                // Expedition Backpack nestled on back
+                drawRoundRect(
+                    color = backpackColor,
+                    topLeft = Offset(centerX + slideW * 0.05f, slideY - 10f),
+                    size = Size(36f, 30f),
+                    cornerRadius = CornerRadius(8f, 8f)
+                )
+                // Bedroll on pack
+                drawRoundRect(
+                    color = bedrollColor,
+                    topLeft = Offset(centerX + slideW * 0.08f, slideY - 18f),
+                    size = Size(30f, 12f),
                     cornerRadius = CornerRadius(5f, 5f)
                 )
-                drawCircle(color = suitAccentColor, radius = 7f, center = Offset(centerX - 16f, tuckY))
 
-                // Right leg tucked
+                // Explorer Head & Crimson Bandana Tucked Low
+                val headR = 19f
+                val headX = centerX + slideW * 0.36f
+                val headY = slideY + 8f
+                drawCircle(color = skinColor, radius = headR, center = Offset(headX, headY))
                 drawRoundRect(
-                    color = suitBaseColor,
-                    topLeft = Offset(centerX + 8f, hipY),
-                    size = Size(16f, tuckY - hipY),
-                    cornerRadius = CornerRadius(5f, 5f)
+                    color = bandanaColor,
+                    topLeft = Offset(headX - headR * 0.9f, headY - headR * 0.8f),
+                    size = Size(headR * 1.8f, headR * 0.85f),
+                    cornerRadius = CornerRadius(4f, 4f)
                 )
-                drawCircle(color = suitAccentColor, radius = 7f, center = Offset(centerX + 16f, tuckY))
             } else {
-                // Running stride legs
-                val leftFootX = centerX - 16f - (legSwing * 0.45f)
-                val rightFootX = centerX + 16f + (legSwing * 0.45f)
+                // ==========================================
+                // STANDING / RUNNING / JUMPING FULL POSE
+                // ==========================================
+                val legSwing = if (isJumping) 0f else sin(runCycle) * 32f
+                val armSwing = if (isJumping) 0f else -sin(runCycle) * 36f
 
-                // Left Leg
-                drawLine(
-                    color = suitBaseColor,
-                    start = Offset(centerX - 12f, hipY),
-                    end = Offset(leftFootX, footY),
-                    strokeWidth = 14f,
-                    cap = StrokeCap.Round
-                )
-                // Left Running Shoe
+                val hipY = currentY - characterHeight * 0.44f
+                val footY = currentY
+
+                if (isJumping) {
+                    // Tucked knees during dramatic athletic leap
+                    val tuckY = currentY - characterHeight * 0.20f
+                    val kneeL = centerX - 24f
+                    val kneeR = centerX + 24f
+
+                    // Left Leg (Tucked)
+                    drawLine(color = pantsColor, start = Offset(centerX - 16f, hipY), end = Offset(kneeL, tuckY), strokeWidth = 22f, cap = StrokeCap.Round)
+                    drawLine(color = pantsColor, start = Offset(kneeL, tuckY), end = Offset(centerX - 14f, tuckY + 12f), strokeWidth = 20f, cap = StrokeCap.Round)
+                    drawRoundRect(color = bootsColor, topLeft = Offset(centerX - 24f, tuckY + 8f), size = Size(24f, 16f), cornerRadius = CornerRadius(5f, 5f))
+
+                    // Right Leg (Tucked)
+                    drawLine(color = pantsColor, start = Offset(centerX + 16f, hipY), end = Offset(kneeR, tuckY), strokeWidth = 22f, cap = StrokeCap.Round)
+                    drawLine(color = pantsColor, start = Offset(kneeR, tuckY), end = Offset(centerX + 14f, tuckY + 12f), strokeWidth = 20f, cap = StrokeCap.Round)
+                    drawRoundRect(color = bootsColor, topLeft = Offset(centerX, tuckY + 8f), size = Size(24f, 16f), cornerRadius = CornerRadius(5f, 5f))
+                } else {
+                    // Running Stride Legs
+                    val leftFootX = centerX - 20f - (legSwing * 0.50f)
+                    val rightFootX = centerX + 20f + (legSwing * 0.50f)
+
+                    // Left Leg
+                    drawLine(
+                        color = pantsColor,
+                        start = Offset(centerX - 16f, hipY),
+                        end = Offset(leftFootX, footY),
+                        strokeWidth = 22f,
+                        cap = StrokeCap.Round
+                    )
+                    // Left Knee Patch
+                    drawCircle(color = vestDarkColor, radius = 9f, center = Offset((centerX - 16f + leftFootX) / 2f, (hipY + footY) / 2f))
+                    // Left Trekking Boot
+                    drawRoundRect(
+                        color = bootsColor,
+                        topLeft = Offset(leftFootX - 14f, footY - 14f),
+                        size = Size(28f, 16f),
+                        cornerRadius = CornerRadius(5f, 5f)
+                    )
+                    drawRect(color = Color.Black, topLeft = Offset(leftFootX - 14f, footY - 2f), size = Size(28f, 4f))
+
+                    // Right Leg
+                    drawLine(
+                        color = pantsColor,
+                        start = Offset(centerX + 16f, hipY),
+                        end = Offset(rightFootX, footY),
+                        strokeWidth = 22f,
+                        cap = StrokeCap.Round
+                    )
+                    // Right Knee Patch
+                    drawCircle(color = vestDarkColor, radius = 9f, center = Offset((centerX + 16f + rightFootX) / 2f, (hipY + footY) / 2f))
+                    // Right Trekking Boot
+                    drawRoundRect(
+                        color = bootsColor,
+                        topLeft = Offset(rightFootX - 14f, footY - 14f),
+                        size = Size(28f, 16f),
+                        cornerRadius = CornerRadius(5f, 5f)
+                    )
+                    drawRect(color = Color.Black, topLeft = Offset(rightFootX - 14f, footY - 2f), size = Size(28f, 4f))
+                }
+
+                // Torso with Khaki Field Shirt & Leather Vest
+                val torsoTopY = currentY - characterHeight * 0.82f
+                val torsoW = characterWidth * 0.76f
+                val torsoH = hipY - torsoTopY
+
+                // Heavy Canvas Explorer Vest
                 drawRoundRect(
-                    color = suitAccentColor,
-                    topLeft = Offset(leftFootX - 10f, footY - 8f),
-                    size = Size(20f, 10f),
+                    brush = Brush.verticalGradient(listOf(vestColor, vestDarkColor)),
+                    topLeft = Offset(centerX - torsoW / 2f, torsoTopY),
+                    size = Size(torsoW, torsoH),
+                    cornerRadius = CornerRadius(14f, 14f)
+                )
+
+                // Field Shirt Collar Peak
+                drawRoundRect(
+                    color = shirtColor,
+                    topLeft = Offset(centerX - torsoW * 0.28f, torsoTopY - 4f),
+                    size = Size(torsoW * 0.56f, 12f),
+                    cornerRadius = CornerRadius(4f, 4f)
+                )
+
+                // Expedition Backpack (Mounted prominently on back facing viewer!)
+                val packW = torsoW * 0.74f
+                val packH = torsoH * 0.70f
+                val packY = torsoTopY + 12f
+
+                drawRoundRect(
+                    brush = Brush.verticalGradient(listOf(backpackColor, vestDarkColor)),
+                    topLeft = Offset(centerX - packW / 2f, packY),
+                    size = Size(packW, packH),
+                    cornerRadius = CornerRadius(10f, 10f)
+                )
+                // Backpack Flap & Brass Buckle
+                drawRoundRect(
+                    color = vestColor,
+                    topLeft = Offset(centerX - packW * 0.40f, packY),
+                    size = Size(packW * 0.80f, packH * 0.45f),
+                    cornerRadius = CornerRadius(6f, 6f)
+                )
+                drawCircle(color = Color(0xFFFBBF24), radius = 3.5f, center = Offset(centerX, packY + packH * 0.42f))
+
+                // Rolled Bedroll Lashed to Top of Pack
+                val bedrollW = packW * 1.15f
+                val bedrollH = 18f
+                drawRoundRect(
+                    color = bedrollColor,
+                    topLeft = Offset(centerX - bedrollW / 2f, packY - bedrollH * 0.65f),
+                    size = Size(bedrollW, bedrollH),
+                    cornerRadius = CornerRadius(6f, 6f)
+                )
+                // Leather Lash Straps with Brass Rivets
+                drawLine(color = vestDarkColor, start = Offset(centerX - bedrollW * 0.28f, packY - bedrollH * 0.65f), end = Offset(centerX - bedrollW * 0.28f, packY + bedrollH * 0.35f), strokeWidth = 4f)
+                drawLine(color = vestDarkColor, start = Offset(centerX + bedrollW * 0.28f, packY - bedrollH * 0.65f), end = Offset(centerX + bedrollW * 0.28f, packY + bedrollH * 0.35f), strokeWidth = 4f)
+
+                // Canteen attached to pack side
+                drawRoundRect(
+                    color = Color(0xFF64748B),
+                    topLeft = Offset(centerX + packW / 2f - 3f, packY + packH * 0.25f),
+                    size = Size(10f, 18f),
                     cornerRadius = CornerRadius(3f, 3f)
                 )
+                drawCircle(color = Color(0xFFFBBF24), radius = 2.5f, center = Offset(centerX + packW / 2f + 2f, packY + packH * 0.25f))
 
-                // Right Leg
-                drawLine(
-                    color = suitBaseColor,
-                    start = Offset(centerX + 12f, hipY),
-                    end = Offset(rightFootX, footY),
-                    strokeWidth = 14f,
-                    cap = StrokeCap.Round
+                // Utility Belt at Waist
+                val beltH = 11f
+                drawRect(
+                    color = vestDarkColor,
+                    topLeft = Offset(centerX - torsoW / 2f + 2f, hipY - beltH),
+                    size = Size(torsoW - 4f, beltH)
                 )
-                // Right Running Shoe
+                // Brass Belt Buckle
                 drawRoundRect(
-                    color = suitAccentColor,
-                    topLeft = Offset(rightFootX - 10f, footY - 8f),
-                    size = Size(20f, 10f),
-                    cornerRadius = CornerRadius(3f, 3f)
+                    color = Color(0xFFFBBF24),
+                    topLeft = Offset(centerX - 8f, hipY - beltH - 1f),
+                    size = Size(16f, beltH + 2f),
+                    cornerRadius = CornerRadius(2f, 2f)
+                )
+
+                // Muscular Arms with Rolled Sleeves
+                if (isJumping) {
+                    // Arms raised up and out for balance
+                    val lHandX = centerX - torsoW / 2f - 24f
+                    val lHandY = torsoTopY - 26f
+                    drawLine(color = shirtColor, start = Offset(centerX - torsoW / 2f, torsoTopY + 12f), end = Offset(lHandX + 10f, torsoTopY - 6f), strokeWidth = 14f, cap = StrokeCap.Round)
+                    drawLine(color = skinColor, start = Offset(lHandX + 10f, torsoTopY - 6f), end = Offset(lHandX, lHandY), strokeWidth = 13f, cap = StrokeCap.Round)
+                    drawCircle(color = skinColor, radius = 7.5f, center = Offset(lHandX, lHandY))
+
+                    val rHandX = centerX + torsoW / 2f + 24f
+                    val rHandY = torsoTopY - 26f
+                    drawLine(color = shirtColor, start = Offset(centerX + torsoW / 2f, torsoTopY + 12f), end = Offset(rHandX - 10f, torsoTopY - 6f), strokeWidth = 14f, cap = StrokeCap.Round)
+                    drawLine(color = skinColor, start = Offset(rHandX - 10f, torsoTopY - 6f), end = Offset(rHandX, rHandY), strokeWidth = 13f, cap = StrokeCap.Round)
+                    drawCircle(color = skinColor, radius = 7.5f, center = Offset(rHandX, rHandY))
+                } else {
+                    // Running Athletic Arm Swings
+                    val lHandY = torsoTopY + torsoH * 0.50f + armSwing * 0.55f
+                    val lHandX = centerX - torsoW / 2f - 16f
+                    drawLine(color = shirtColor, start = Offset(centerX - torsoW / 2f + 2f, torsoTopY + 12f), end = Offset(lHandX + 6f, lHandY - 14f), strokeWidth = 14f, cap = StrokeCap.Round)
+                    drawLine(color = skinColor, start = Offset(lHandX + 6f, lHandY - 14f), end = Offset(lHandX, lHandY), strokeWidth = 13f, cap = StrokeCap.Round)
+                    // Leather wristband
+                    drawLine(color = vestDarkColor, start = Offset(lHandX + 2f, lHandY - 6f), end = Offset(lHandX + 5f, lHandY - 10f), strokeWidth = 4f)
+                    drawCircle(color = skinColor, radius = 7.5f, center = Offset(lHandX, lHandY))
+
+                    val rHandY = torsoTopY + torsoH * 0.50f - armSwing * 0.55f
+                    val rHandX = centerX + torsoW / 2f + 16f
+                    drawLine(color = shirtColor, start = Offset(centerX + torsoW / 2f - 2f, torsoTopY + 12f), end = Offset(rHandX - 6f, rHandY - 14f), strokeWidth = 14f, cap = StrokeCap.Round)
+                    drawLine(color = skinColor, start = Offset(rHandX - 6f, rHandY - 14f), end = Offset(rHandX, rHandY), strokeWidth = 13f, cap = StrokeCap.Round)
+                    // Leather wristband
+                    drawLine(color = vestDarkColor, start = Offset(rHandX - 2f, rHandY - 6f), end = Offset(rHandX - 5f, rHandY - 10f), strokeWidth = 4f)
+                    drawCircle(color = skinColor, radius = 7.5f, center = Offset(rHandX, rHandY))
+                }
+
+                // Head, Dark Textured Hair & Crimson Explorer Bandana
+                val headR = 21f
+                val headCenterY = currentY - characterHeight + headR + 4f
+
+                // Neck
+                drawRect(color = skinColor, topLeft = Offset(centerX - 8f, torsoTopY - 8f), size = Size(16f, 10f))
+
+                // Head Base
+                drawCircle(color = skinColor, radius = headR, center = Offset(centerX, headCenterY))
+
+                // Dark Textured Hair (Viewed from Behind)
+                drawOval(
+                    color = Color(0xFF1C1917),
+                    topLeft = Offset(centerX - headR, headCenterY - headR),
+                    size = Size(headR * 2f, headR * 1.5f)
+                )
+
+                // Crimson Adventurer Bandana / Headwrap
+                drawRoundRect(
+                    color = bandanaColor,
+                    topLeft = Offset(centerX - headR * 0.95f, headCenterY - headR * 0.40f),
+                    size = Size(headR * 1.90f, headR * 0.65f),
+                    cornerRadius = CornerRadius(4f, 4f)
+                )
+                // Bandana Tied Knot Tails Streaming Behind
+                drawLine(
+                    color = bandanaColor,
+                    start = Offset(centerX + 6f, headCenterY),
+                    end = Offset(centerX + 18f, headCenterY + 14f),
+                    strokeWidth = 5f,
+                    cap = StrokeCap.Round
+                )
+                drawLine(
+                    color = bandanaColor,
+                    start = Offset(centerX + 10f, headCenterY + 2f),
+                    end = Offset(centerX + 24f, headCenterY + 10f),
+                    strokeWidth = 4f,
+                    cap = StrokeCap.Round
                 )
             }
-
-            // Torso (V-tapered athletic suit)
-            val torsoTopY = currentY - characterHeight * 0.78f
-            val torsoW = characterWidth * 0.72f
-            val torsoH = hipY - torsoTopY
-
-            drawRoundRect(
-                brush = Brush.verticalGradient(listOf(suitAccentColor, suitBaseColor)),
-                topLeft = Offset(centerX - torsoW / 2f, torsoTopY),
-                size = Size(torsoW, torsoH),
-                cornerRadius = CornerRadius(12f, 12f)
-            )
-
-            // High-Tech Chest Arc Reactor Core (Pulsing Cyan)
-            drawCircle(
-                color = Color.White,
-                radius = 7f,
-                center = Offset(centerX, torsoTopY + torsoH * 0.35f)
-            )
-            drawCircle(
-                color = visorGlowColor.copy(alpha = 0.5f),
-                radius = 12f,
-                center = Offset(centerX, torsoTopY + torsoH * 0.35f)
-            )
-
-            // Shoulder Guards
-            drawCircle(color = suitBaseColor, radius = 9f, center = Offset(centerX - torsoW / 2f + 2f, torsoTopY + 4f))
-            drawCircle(color = suitBaseColor, radius = 9f, center = Offset(centerX + torsoW / 2f - 2f, torsoTopY + 4f))
-
-            // Arms
-            if (isJumping) {
-                // Arms raised up in victory leap
-                drawLine(
-                    color = suitBaseColor,
-                    start = Offset(centerX - torsoW / 2f, torsoTopY + 8f),
-                    end = Offset(centerX - torsoW / 2f - 18f, torsoTopY - 22f),
-                    strokeWidth = 10f,
-                    cap = StrokeCap.Round
-                )
-                drawCircle(color = suitAccentColor, radius = 6f, center = Offset(centerX - torsoW / 2f - 18f, torsoTopY - 22f))
-
-                drawLine(
-                    color = suitBaseColor,
-                    start = Offset(centerX + torsoW / 2f, torsoTopY + 8f),
-                    end = Offset(centerX + torsoW / 2f + 18f, torsoTopY - 22f),
-                    strokeWidth = 10f,
-                    cap = StrokeCap.Round
-                )
-                drawCircle(color = suitAccentColor, radius = 6f, center = Offset(centerX + torsoW / 2f + 18f, torsoTopY - 22f))
-            } else {
-                // Running arm swings
-                val leftHandY = torsoTopY + torsoH * 0.5f + armSwing * 0.5f
-                val rightHandY = torsoTopY + torsoH * 0.5f - armSwing * 0.5f
-
-                drawLine(
-                    color = suitBaseColor,
-                    start = Offset(centerX - torsoW / 2f, torsoTopY + 8f),
-                    end = Offset(centerX - torsoW / 2f - 12f, leftHandY),
-                    strokeWidth = 10f,
-                    cap = StrokeCap.Round
-                )
-                drawCircle(color = suitAccentColor, radius = 5.5f, center = Offset(centerX - torsoW / 2f - 12f, leftHandY))
-
-                drawLine(
-                    color = suitBaseColor,
-                    start = Offset(centerX + torsoW / 2f, torsoTopY + 8f),
-                    end = Offset(centerX + torsoW / 2f + 12f, rightHandY),
-                    strokeWidth = 10f,
-                    cap = StrokeCap.Round
-                )
-                drawCircle(color = suitAccentColor, radius = 5.5f, center = Offset(centerX + torsoW / 2f + 12f, rightHandY))
-            }
-
-            // Cyber Helmet & Head
-            val headRadius = 18f
-            val headCenterY = currentY - characterHeight + headRadius + 2f
-
-            drawCircle(
-                color = suitAccentColor,
-                radius = headRadius,
-                center = Offset(centerX, headCenterY)
-            )
-
-            // Aerodynamic Visor Curved Blade
-            drawRoundRect(
-                color = Color(0xFF0F172A),
-                topLeft = Offset(centerX - headRadius * 0.85f, headCenterY - headRadius * 0.35f),
-                size = Size(headRadius * 1.7f, headRadius * 0.70f),
-                cornerRadius = CornerRadius(5f, 5f)
-            )
-            // Visor Cyan Glow Slit
-            drawLine(
-                color = visorGlowColor,
-                start = Offset(centerX - headRadius * 0.65f, headCenterY),
-                end = Offset(centerX + headRadius * 0.65f, headCenterY),
-                strokeWidth = 3.5f,
-                cap = StrokeCap.Round
-            )
         }
     }
 }
@@ -1653,6 +1987,20 @@ private fun LandscapeDrivingGameView(
     onActivityCompleted: () -> Unit,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
+    DisposableEffect(Unit) {
+        val activity = context as? Activity
+        val originalOrientation = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        onDispose {
+            activity?.requestedOrientation = originalOrientation
+        }
+    }
+
+    BackHandler {
+        onBack()
+    }
+
     var playerLane by remember { mutableIntStateOf(1) } // 0=Left, 1=Center, 2=Right
     var carLateralOffset by remember { mutableFloatStateOf(0f) } // -100f to +100f
     var speedKmH by remember { mutableIntStateOf(60) }
@@ -1686,6 +2034,25 @@ private fun LandscapeDrivingGameView(
 
     var roadScrollOffset by remember { mutableFloatStateOf(0f) }
     var roadCurveOffset by remember { mutableFloatStateOf(0f) }
+
+    // Reset game state whenever a new official trial attempt is initiated
+    LaunchedEffect(trialAttemptId) {
+        if (!isPractice && isGameRunning) {
+            trafficCars.clear()
+            carLateralOffset = 0f
+            playerLane = 1
+            wheelRotationAngle = 0f
+            trafficEncountered = 0
+            trafficAvoided = 0
+            trafficCollisions = 0
+            drivingScore = 0
+            distanceTraveledMeters = 0f
+            totalLatencySum = 0L
+            latencyEventsCount = 0
+            actionsCount = 0
+            collisionFlash = false
+        }
+    }
 
     // Driving Simulation Loop
     LaunchedEffect(isGameRunning, isGamePaused) {
@@ -1877,7 +2244,7 @@ private fun LandscapeDrivingGameView(
             val width = size.width
             val height = size.height
 
-            val horizonY = height * 0.28f
+            val horizonY = height * 0.22f
             val bottomY = height
 
             // 1. SKY & SUNSET HORIZON
@@ -1915,9 +2282,9 @@ private fun LandscapeDrivingGameView(
                 size = Size(width, bottomY - horizonY)
             )
 
-            // 3. ROAD PERSPECTIVE GEOMETRY
-            val roadBottomW = width * 0.86f
-            val roadHorizonW = width * 0.24f
+            // 3. ROAD PERSPECTIVE GEOMETRY (Landscape Highway)
+            val roadBottomW = width * 0.65f
+            val roadHorizonW = width * 0.18f
             val horizonCenter = width / 2f + roadCurveOffset * 0.35f
             val bottomCenter = width / 2f + roadCurveOffset
 
@@ -2029,12 +2396,10 @@ private fun LandscapeDrivingGameView(
 
             // 6. PLAYER CAR MODEL: SUBSTANTIAL, ELEVATED 3D SPORTS CAR
             val playerLaneW = roadBottomW / 3f
-            val playerCarCenterX = bottomCenter + (carLateralOffset / 100f) * (playerLaneW * 1.15f)
-            val playerCarY = bottomY - 145f
-
-            // Substantial, realistic proportions!
-            val playerCarW = 190f
-            val playerCarH = 265f
+            val playerCarCenterX = bottomCenter + (carLateralOffset / 100f) * (playerLaneW * 1.12f)
+            val playerCarH = (height * 0.38f).coerceIn(160f, 220f)
+            val playerCarW = playerCarH * 0.72f
+            val playerCarY = bottomY - playerCarH * 0.54f
 
             drawPlayerVehicle(
                 scope = this,
@@ -2186,8 +2551,8 @@ private fun LandscapeDrivingGameView(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 28.dp, bottom = 18.dp)
-                .size(160.dp)
+                .padding(start = 24.dp, bottom = 14.dp)
+                .size(175.dp)
                 .pointerInput(isGameRunning, isPractice) {
                     val cx = size.width / 2f
                     val cy = size.height / 2f

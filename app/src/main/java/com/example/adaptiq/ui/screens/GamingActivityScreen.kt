@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.adaptiq.ui.components.*
+import com.example.adaptiq.ui.runner3d.Runner3DGameView
 import com.example.adaptiq.ui.theme.*
 import kotlinx.coroutines.delay
 import java.util.Locale
@@ -184,9 +185,9 @@ fun GamingActivityScreen(
         gameMode = GamingMode.SELECTION
     }
 
-    // 1. RUNNER GAME: Dedicated Full-Screen Immersive Arcade View (Portrait)
+    // 1. RUNNER GAME: Dedicated Full-Screen Immersive Arcade View (Portrait 3D)
     if (gameMode == GamingMode.RUNNER) {
-        PortraitRunnerGameView(
+        Runner3DGameView(
             trialAttemptId = currentAttemptId,
             isPractice = isPractice,
             isGameRunning = isGameRunning,

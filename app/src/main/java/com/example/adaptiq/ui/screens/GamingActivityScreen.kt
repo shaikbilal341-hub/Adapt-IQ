@@ -66,6 +66,7 @@ data class GamingTrialResults(
 
 @Composable
 fun GamingActivityScreen(
+    initialGameMode: GamingMode = GamingMode.SELECTION,
     onLogEvent: (
         expectedAction: String,
         detectedAction: String,
@@ -79,7 +80,7 @@ fun GamingActivityScreen(
     onActivityCompleted: () -> Unit,
     onBack: () -> Unit
 ) {
-    var gameMode by remember { mutableStateOf(GamingMode.SELECTION) }
+    var gameMode by remember { mutableStateOf(initialGameMode) }
     var isPractice by remember { mutableStateOf(true) }
 
     // Monotonic Clock Active Trial Timing

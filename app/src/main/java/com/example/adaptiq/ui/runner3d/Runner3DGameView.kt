@@ -69,6 +69,8 @@ fun Runner3DGameView(
     var actionsCount by remember { mutableIntStateOf(0) }
     var totalLatencySum by remember { mutableLongStateOf(0L) }
     var latencyEventsCount by remember { mutableIntStateOf(0) }
+    var showCollisionFlash by remember { mutableStateOf(false) }
+    var hudTick by remember { mutableLongStateOf(0L) }
 
     var lastGestureTime by remember { mutableLongStateOf(0L) }
     var lastLaneLogTime by remember { mutableLongStateOf(0L) }
@@ -83,6 +85,7 @@ fun Runner3DGameView(
                     else -> "Right"
                 }
                 statusText = "💥 Impact with ${obstacle.type.name} in $laneName Lane!"
+                showCollisionFlash = true
                 if (!isPractice) {
                     onLogEvent(
                         when (obstacle.type.name) {
@@ -151,14 +154,25 @@ fun Runner3DGameView(
         renderer.isPractice = isPractice
     }
 
-    // Reset Trial
-    LaunchedEffect(trialAttemptId) {
-        if (!isPractice && isGameRunning) {
+    // Dynamic HUD update tick loop while game is actively running
+    LaunchedEffect(isGameRunning, isGamePaused) {
+        if (isGameRunning && !isGamePaused) {
+            while (isGameRunning && !isGamePaused) {
+                delay(80L)
+                hudTick++
+            }
+        }
+    }
+
+    // Reset Trial when starting a run or new trial
+    LaunchedEffect(isGameRunning, trialAttemptId) {
+        if (isGameRunning) {
             renderer.resetTrial()
             actionsCount = 0
             totalLatencySum = 0L
             latencyEventsCount = 0
-            statusText = "Trial Started: Navigate 3D Ancient Ruins!"
+            showCollisionFlash = false
+            statusText = if (isPractice) "3D Practice Run: Swipe to Dodge & Leap!" else "Trial Started: Navigate 3D Ancient Ruins!"
         }
     }
 
@@ -185,10 +199,10 @@ fun Runner3DGameView(
     }
 
     // Auto-dismiss red collision flash
-    LaunchedEffect(renderer.collisionFlash) {
-        if (renderer.collisionFlash) {
+    LaunchedEffect(showCollisionFlash) {
+        if (showCollisionFlash) {
             delay(280L)
-            renderer.collisionFlash = false
+            showCollisionFlash = false
         }
     }
 
@@ -271,7 +285,7 @@ fun Runner3DGameView(
         )
 
         // 2. Fullscreen Red Collision Vignette (Only triggers upon confirmed genuine collision!)
-        if (renderer.collisionFlash) {
+        if (showCollisionFlash) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -344,6 +358,11 @@ fun Runner3DGameView(
             }
 
             // Stats Pill Row (Score, Avoided, Collisions, Meters)
+            val currentScore = if (hudTick >= 0) renderer.score else 0
+            val currentMeters = renderer.metersRun.toInt()
+            val currentAvoided = renderer.obstaclesAvoided
+            val currentCollided = renderer.obstaclesCollided
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -354,7 +373,7 @@ fun Runner3DGameView(
                     border = BorderStroke(1.dp, BorderSubtle)
                 ) {
                     Text(
-                        text = "Score: ${renderer.score} • ${renderer.metersRun.toInt()}m",
+                        text = "Score: $currentScore • ${currentMeters}m",
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         color = Color.White,
                         fontSize = 12.sp,
@@ -368,9 +387,9 @@ fun Runner3DGameView(
                     border = BorderStroke(1.dp, BorderSubtle)
                 ) {
                     Text(
-                        text = "✓ Avoided: ${renderer.obstaclesAvoided}  💥 Collisions: ${renderer.obstaclesCollided}",
+                        text = "✓ Avoided: $currentAvoided  💥 Collisions: $currentCollided",
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        color = if (renderer.obstaclesCollided > 0) Color(0xFFFCA5A5) else Color(0xFF86EFAC),
+                        color = if (currentCollided > 0) Color(0xFFFCA5A5) else Color(0xFF86EFAC),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold
                     )

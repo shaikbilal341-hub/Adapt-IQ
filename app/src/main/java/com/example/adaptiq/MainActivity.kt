@@ -97,6 +97,7 @@ class MainActivity : ComponentActivity() {
     private var gamingStatus by mutableStateOf(ActivityStatus.NOT_STARTED)
 
     private var lastCsvPath by mutableStateOf<String?>(null)
+    private var targetGameMode by mutableStateOf(GamingMode.SELECTION)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -105,7 +106,17 @@ class MainActivity : ComponentActivity() {
 
         // Durable Consent check: consent persists across recreations and restarts
         val consentAccepted = ConsentManager.isConsentAccepted(this)
-        currentScreen = if (consentAccepted) Screen.HOME else Screen.WELCOME
+        val targetScreen = intent?.getStringExtra("screen")
+        val modeExtra = intent?.getStringExtra("mode")
+        targetGameMode = if (modeExtra == "runner") GamingMode.RUNNER else GamingMode.SELECTION
+        if (targetScreen == "gaming") {
+            if (!isSessionActive) {
+                startFallbackLocalSession()
+            }
+            currentScreen = Screen.GAMING
+        } else {
+            currentScreen = if (consentAccepted) Screen.HOME else Screen.WELCOME
+        }
 
         setContent {
             AdaptIQTheme {
@@ -116,6 +127,20 @@ class MainActivity : ComponentActivity() {
                     AdaptIQAppRouter()
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val targetScreen = intent.getStringExtra("screen")
+        val modeExtra = intent.getStringExtra("mode")
+        targetGameMode = if (modeExtra == "runner") GamingMode.RUNNER else GamingMode.SELECTION
+        if (targetScreen == "gaming") {
+            if (!isSessionActive) {
+                startFallbackLocalSession()
+            }
+            currentScreen = Screen.GAMING
         }
     }
 
@@ -365,6 +390,7 @@ class MainActivity : ComponentActivity() {
                 onBack = { currentScreen = Screen.CONDUCT_SESSION }
             )
             Screen.GAMING -> GamingActivityScreen(
+                initialGameMode = targetGameMode,
                 onLogEvent = { exp, det, res, att, dur, touch, gMode ->
                     logActionEvent("gaming", exp, det, res, att, dur, touch, gMode)
                 },

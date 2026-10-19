@@ -231,7 +231,7 @@ class Runner3DGLRenderer(
         runCycle += dt * 11.0f
 
         // 2. Smooth Lateral Lane Movement
-        val targetX = (targetLane - 1) * 1.8f
+        val targetX = (1 - targetLane) * 1.8f
         currentLaneX += (targetX - currentLaneX) * (12.0f * dt).coerceAtMost(1.0f)
 
         // 3. Action State Kinematics
@@ -299,7 +299,7 @@ class Runner3DGLRenderer(
             val obs = iterator.next()
             obs.depth += dt / approachTime
 
-            val obsX = (obs.lane - 1) * 1.8f
+            val obsX = (1 - obs.lane) * 1.8f
             val charX = currentLaneX
 
             // Precise Collision Evaluation Window: Only at player intersection depth
@@ -510,7 +510,7 @@ class Runner3DGLRenderer(
     private fun renderObstacles() {
         for (obs in activeObstacles) {
             val obsZ = spawnDistance * (1.0f - obs.depth)
-            val obsX = (obs.lane - 1) * 1.8f
+            val obsX = (1 - obs.lane) * 1.8f
 
             when (obs.type) {
                 RunnerObstacleType.JUMP_HURDLE -> {
@@ -557,7 +557,7 @@ class Runner3DGLRenderer(
         val charY = playerY + 0.92f + strideBob
 
         // Dynamic Lateral Banking Roll Angle during lane transitions
-        val bankingAngle = (targetLane - 1 - (currentLaneX / 1.8f)) * -16.0f
+        val bankingAngle = (1 - targetLane - (currentLaneX / 1.8f)) * -16.0f
 
         // 1. Dynamic Decoupled Ground Contact Shadow
         val shadowScale = if (isJumping) {

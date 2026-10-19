@@ -21,10 +21,13 @@ import kotlinx.coroutines.withContext
 
 @Composable
 fun AdminLoginScreen(
+    initialServerUrl: String = AdminApiClient.baseUrl,
+    onSaveServerUrl: (String) -> Unit = {},
     onLoginSuccess: (String) -> Unit
 ) {
     var email by remember { mutableStateOf("nandakishore.christ@gmail.com") }
     var password by remember { mutableStateOf("") }
+    var serverUrl by remember { mutableStateOf(initialServerUrl) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -53,7 +56,7 @@ fun AdminLoginScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -62,8 +65,21 @@ fun AdminLoginScreen(
             ) {
                 Column(
                     modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
+                    OutlinedTextField(
+                        value = serverUrl,
+                        onValueChange = {
+                            serverUrl = it
+                            AdminApiClient.setServerUrl(it)
+                            onSaveServerUrl(it)
+                            errorMessage = null
+                        },
+                        label = { Text("Backend Server URL") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
                     OutlinedTextField(
                         value = email,
                         onValueChange = { email = it; errorMessage = null },

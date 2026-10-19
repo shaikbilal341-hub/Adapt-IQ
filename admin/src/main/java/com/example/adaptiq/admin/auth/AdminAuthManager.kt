@@ -34,7 +34,16 @@ class AdminAuthManager(context: Context) {
         return !getToken().isNullOrBlank()
     }
 
+    fun saveServerUrl(url: String) {
+        sharedPreferences.edit().putString(KEY_SERVER_URL, url).apply()
+    }
+
+    fun getServerUrl(): String {
+        return sharedPreferences.getString(KEY_SERVER_URL, null) ?: "http://10.0.2.2:4000/"
+    }
+
     companion object {
         private const val KEY_ADMIN_TOKEN = "admin_jwt_token"
+        private const val KEY_SERVER_URL = "admin_server_url"
     }
 }

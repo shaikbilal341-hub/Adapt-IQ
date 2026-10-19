@@ -96,15 +96,29 @@ interface AdaptIqApi {
 }
 
 object AdaptIqHttpClient {
-    // Configured to Windows PC Wi-Fi LAN address for physical mobile testing.
-    // (Ensure your phone and PC are on the same Wi-Fi network).
-    private const val BASE_URL = "http://192.168.0.102:4000/"
+    @Volatile
+    var baseUrl: String = "http://10.0.2.2:4000/"
+        set(value) {
+            val normalized = if (value.endsWith("/")) value else "$value/"
+            field = normalized
+            _api = createApi(normalized)
+        }
 
-    val api: AdaptIqApi by lazy {
-        Retrofit.Builder()
-            .baseUrl(BASE_URL)
+    private var _api: AdaptIqApi = createApi(baseUrl)
+
+    val api: AdaptIqApi
+        get() = _api
+
+    fun setServerUrl(url: String) {
+        baseUrl = url
+    }
+
+    private fun createApi(url: String): AdaptIqApi {
+        return Retrofit.Builder()
+            .baseUrl(url)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(AdaptIqApi::class.java)
     }
 }
+

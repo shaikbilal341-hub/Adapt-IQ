@@ -34,6 +34,7 @@ class AdminMainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         authManager = AdminAuthManager(this)
+        AdminApiClient.setServerUrl(authManager.getServerUrl())
 
         setContent {
             AdaptIQAdminTheme {
@@ -111,6 +112,8 @@ class AdminMainActivity : ComponentActivity() {
 
         when (currentScreen) {
             AdminScreen.LOGIN -> AdminLoginScreen(
+                initialServerUrl = authManager.getServerUrl(),
+                onSaveServerUrl = { url -> authManager.saveServerUrl(url) },
                 onLoginSuccess = { token ->
                     authManager.saveToken(token)
                     currentScreen = AdminScreen.DASHBOARD

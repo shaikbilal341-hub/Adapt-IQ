@@ -1,7 +1,11 @@
 package com.example.adaptiq.admin.sync
 
+import com.example.adaptiq.admin.BuildConfig
+import com.example.adaptiq.admin.auth.AdminAuthManager
 import com.google.gson.JsonObject
 import com.google.gson.annotations.SerializedName
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -10,6 +14,7 @@ import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Path
+import java.util.concurrent.TimeUnit
 
 data class AdminLoginRequest(
     @SerializedName("email") val email: String,
@@ -80,6 +85,9 @@ data class SessionDetailDto(
 )
 
 interface AdminApi {
+    @GET("health")
+    suspend fun checkHealth(): Response<JsonObject>
+
     @POST("api/v1/auth/admin/login")
     suspend fun adminLogin(@Body request: AdminLoginRequest): Response<AdminLoginResponse>
 
@@ -98,7 +106,7 @@ interface AdminApi {
 
 object AdminApiClient {
     @Volatile
-    var baseUrl: String = "http://10.0.2.2:4000/"
+    var baseUrl: String = if (AdminAuthManager.isEmulator()) BuildConfig.DEFAULT_EMULATOR_URL else BuildConfig.DEFAULT_DEVICE_URL
         set(value) {
             val normalized = if (value.endsWith("/")) value else "$value/"
             field = normalized
@@ -115,8 +123,19 @@ object AdminApiClient {
     }
 
     private fun createApi(url: String): AdminApi {
+        val logging = HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BASIC
+        }
+        val okHttpClient = OkHttpClient.Builder()
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .writeTimeout(10, TimeUnit.SECONDS)
+            .addInterceptor(logging)
+            .build()
+
         return Retrofit.Builder()
             .baseUrl(url)
+            .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(AdminApi::class.java)

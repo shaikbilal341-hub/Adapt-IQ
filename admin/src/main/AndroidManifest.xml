@@ -9,7 +9,7 @@
         android:icon="@android:drawable/ic_menu_info_details"
         android:label="Adapt-IQ Admin"
         android:supportsRtl="true"
-        android:usesCleartextTraffic="true"
+        android:usesCleartextTraffic="${usesCleartextTraffic}"
         android:theme="@style/Theme.AdaptIQ">
 
         <activity

@@ -106,7 +106,13 @@ interface AdminApi {
 
 object AdminApiClient {
     @Volatile
-    var baseUrl: String = if (AdminAuthManager.isEmulator()) BuildConfig.DEFAULT_EMULATOR_URL else BuildConfig.DEFAULT_DEVICE_URL
+    var baseUrl: String = if (BuildConfig.IS_RELEASE && BuildConfig.PROD_URL.isNotBlank()) {
+        BuildConfig.PROD_URL
+    } else if (AdminAuthManager.isEmulator()) {
+        BuildConfig.DEFAULT_EMULATOR_URL
+    } else {
+        BuildConfig.DEFAULT_DEVICE_URL
+    }
         set(value) {
             val normalized = if (value.endsWith("/")) value else "$value/"
             field = normalized

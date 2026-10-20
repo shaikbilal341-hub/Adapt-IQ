@@ -1,5 +1,7 @@
 package com.example.adaptiq.sync
 
+import android.os.Build
+import com.example.adaptiq.BuildConfig
 import com.google.gson.annotations.SerializedName
 import retrofit2.Response
 import retrofit2.Retrofit
@@ -8,6 +10,26 @@ import retrofit2.http.Body
 import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Path
+
+fun isEmulator(): Boolean {
+    return (Build.FINGERPRINT.startsWith("generic")
+            || Build.FINGERPRINT.startsWith("unknown")
+            || Build.MODEL.contains("google_sdk")
+            || Build.MODEL.contains("Emulator")
+            || Build.MODEL.contains("Android SDK built for x86")
+            || Build.MANUFACTURER.contains("Genymotion")
+            || (Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic"))
+            || "google_sdk" == Build.PRODUCT
+            || Build.HARDWARE.contains("goldfish")
+            || Build.HARDWARE.contains("ranchu"))
+}
+
+fun getDefaultBaseUrl(): String {
+    if (BuildConfig.IS_RELEASE && BuildConfig.PROD_URL.isNotBlank()) {
+        return BuildConfig.PROD_URL
+    }
+    return if (isEmulator()) BuildConfig.DEFAULT_EMULATOR_URL else BuildConfig.DEFAULT_DEVICE_URL
+}
 
 data class ParticipantSessionStartRequest(
     @SerializedName("participantType") val participantType: String,
@@ -97,7 +119,7 @@ interface AdaptIqApi {
 
 object AdaptIqHttpClient {
     @Volatile
-    var baseUrl: String = "http://10.0.2.2:4000/"
+    var baseUrl: String = getDefaultBaseUrl()
         set(value) {
             val normalized = if (value.endsWith("/")) value else "$value/"
             field = normalized

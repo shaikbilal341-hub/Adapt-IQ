@@ -43,14 +43,19 @@ class AdminAuthManager(context: Context) {
     fun getServerUrl(): String {
         val saved = sharedPreferences.getString(KEY_SERVER_URL, null)
         if (!saved.isNullOrBlank()) {
-            // If on a physical device, 10.0.2.2 will never connect.
-            // If it was saved from the old default, migrate to physical device default URL.
-            if (!isEmulator() && saved.contains("10.0.2.2")) {
+            if (BuildConfig.IS_RELEASE && !saved.startsWith("https://")) {
+                if (BuildConfig.PROD_URL.startsWith("https://")) {
+                    return BuildConfig.PROD_URL
+                }
+            } else if (!isEmulator() && saved.contains("10.0.2.2")) {
                 val upgraded = BuildConfig.DEFAULT_DEVICE_URL
                 saveServerUrl(upgraded)
                 return upgraded
             }
             return saved
+        }
+        if (BuildConfig.IS_RELEASE && BuildConfig.PROD_URL.isNotBlank()) {
+            return BuildConfig.PROD_URL
         }
         return if (isEmulator()) BuildConfig.DEFAULT_EMULATOR_URL else BuildConfig.DEFAULT_DEVICE_URL
     }

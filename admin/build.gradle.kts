@@ -44,6 +44,13 @@ fun getLocalIpAddress(): String {
     return "192.168.0.103"
 }
 
+fun getProductionUrl(): String {
+    val prodUrl = project.findProperty("prodBackendUrl") as? String
+        ?: System.getenv("PROD_BACKEND_URL")
+        ?: ""
+    return if (prodUrl.isNotBlank() && !prodUrl.endsWith("/")) "$prodUrl/" else prodUrl
+}
+
 android {
     namespace = "com.example.adaptiq.admin"
     compileSdk = 35
@@ -58,13 +65,21 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         val detectedHost = getLocalIpAddress()
+        val prodUrl = getProductionUrl()
         buildConfigField("String", "DEFAULT_EMULATOR_URL", "\"http://10.0.2.2:4000/\"")
         buildConfigField("String", "DEFAULT_DEVICE_URL", "\"http://$detectedHost:4000/\"")
         buildConfigField("String", "HOST_LAN_IP", "\"$detectedHost\"")
+        buildConfigField("String", "PROD_URL", "\"$prodUrl\"")
     }
 
     buildTypes {
+        debug {
+            manifestPlaceholders["usesCleartextTraffic"] = "true"
+            buildConfigField("Boolean", "IS_RELEASE", "false")
+        }
         release {
+            manifestPlaceholders["usesCleartextTraffic"] = "false"
+            buildConfigField("Boolean", "IS_RELEASE", "true")
             optimization {
                 enable = false
             }

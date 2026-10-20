@@ -38,18 +38,24 @@ fun VisualSearchActivityScreen(
     onBack: () -> Unit
 ) {
     val totalTrials = 3
-    val targetSymbol = "X"
+    val symbols = listOf("O", "A", "V", "X", "M", "S", "W", "K", "Z")
+    val targetSymbols = listOf("X", "A", "M")
     var currentTrial by remember { mutableIntStateOf(1) }
     var isPractice by remember { mutableStateOf(true) }
     var isCompleted by remember { mutableStateOf(false) }
     var trialStartTime by remember { mutableLongStateOf(0L) }
-    var feedbackText by remember { mutableStateOf("Find and tap the letter 'X' in the grid below.") }
 
-    val symbols = listOf("O", "A", "V", "X", "M", "S", "W", "K", "Z")
+    val currentTargetSymbol = targetSymbols.getOrElse((currentTrial - 1) % targetSymbols.size) {
+        symbols[(currentTrial - 1) % symbols.size]
+    }
+    var feedbackText by remember { mutableStateOf("Find and tap the letter '$currentTargetSymbol' in the grid below.") }
 
     LaunchedEffect(currentTrial, isPractice) {
         if (!isPractice) {
             trialStartTime = System.currentTimeMillis()
+            feedbackText = "Find and tap the letter '$currentTargetSymbol'."
+        } else {
+            feedbackText = "Find and tap the letter '$currentTargetSymbol' in the grid below."
         }
     }
 
@@ -65,7 +71,7 @@ fun VisualSearchActivityScreen(
                 isPractice = false
                 currentTrial = 1
                 isCompleted = false
-                feedbackText = "Find and tap the letter 'X'."
+                feedbackText = "Find and tap the letter '${targetSymbols.first()}'."
             }
         )
 
@@ -82,7 +88,7 @@ fun VisualSearchActivityScreen(
                         color = TextPrimary
                     )
                     Text(
-                        text = "Target: '$targetSymbol'",
+                        text = "Target: '$currentTargetSymbol'",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = AccentTeal
@@ -118,13 +124,13 @@ fun VisualSearchActivityScreen(
                                 .border(1.dp, BorderSubtle, RoundedCornerShape(14.dp))
                                 .clickable {
                                     val duration = if (trialStartTime > 0) System.currentTimeMillis() - trialStartTime else 0L
-                                    val success = symbol == targetSymbol
+                                    val success = symbol == currentTargetSymbol
 
                                     feedbackText = if (success) "✓ Correct Symbol Found! (${duration}ms)" else "Incorrect symbol. Try again."
 
                                     if (!isPractice) {
                                         onLogEvent(
-                                            "find_$targetSymbol",
+                                            "find_$currentTargetSymbol",
                                             "tapped_$symbol",
                                             if (success) "successful" else "incorrect",
                                             currentTrial,
@@ -138,7 +144,6 @@ fun VisualSearchActivityScreen(
                                             delay(800)
                                             if (currentTrial < totalTrials) {
                                                 currentTrial++
-                                                feedbackText = "Find and tap the letter 'X'."
                                             } else {
                                                 isCompleted = true
                                             }
@@ -149,7 +154,7 @@ fun VisualSearchActivityScreen(
                         ) {
                             Text(
                                 text = symbol,
-                                color = if (symbol == targetSymbol && isPractice) AccentTeal else TextPrimary,
+                                color = if (symbol == currentTargetSymbol && isPractice) AccentTeal else TextPrimary,
                                 fontSize = 30.sp,
                                 fontWeight = FontWeight.Bold
                             )

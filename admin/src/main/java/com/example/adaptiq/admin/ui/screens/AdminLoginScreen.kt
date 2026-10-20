@@ -28,7 +28,7 @@ fun AdminLoginScreen(
     onSaveServerUrl: (String) -> Unit = {},
     onLoginSuccess: (String) -> Unit
 ) {
-    var email by remember { mutableStateOf("nandakishore.christ@gmail.com") }
+    var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var serverUrl by remember { mutableStateOf(initialServerUrl) }
     var isLoading by remember { mutableStateOf(false) }

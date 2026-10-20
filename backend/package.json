@@ -8,6 +8,7 @@
     "start": "node dist/server.js",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "clean:port": "npx kill-port 4000",
+    "admin:create": "ts-node src/scripts/create-admin.ts",
     "test": "jest --runInBand --detectOpenHandles"
   },
   "dependencies": {

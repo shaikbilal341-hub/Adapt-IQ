@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import prisma from '../../config/database';
 import { generateSessionToken, generateAdminToken } from '../../middleware/auth.middleware';
+import { adminLoginLimiter } from '../../middleware/rate-limiter.middleware';
 
 const router = Router();
 
@@ -52,8 +53,8 @@ router.post('/participant/session/start', async (req: Request, res: Response) =>
     }
 });
 
-// Admin login (Unchanged)
-router.post('/admin/login', async (req: Request, res: Response) => {
+// Admin login (Protected with rate limiting)
+router.post('/admin/login', adminLoginLimiter, async (req: Request, res: Response) => {
     try {
         const { email, password } = req.body;
         if (!email || !password) {

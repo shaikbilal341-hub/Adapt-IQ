@@ -1,6 +1,8 @@
 import { validateAndGetJwtSecret } from '../src/middleware/auth.middleware';
 import bcrypt from 'bcrypt';
 import prisma from '../src/config/database';
+import request from 'supertest';
+import app from '../src/server';
 
 describe('Security & Authentication Hardening Tests', () => {
     const originalEnv = process.env;
@@ -124,6 +126,106 @@ describe('Security & Authentication Hardening Tests', () => {
                 .post('/api/v1/auth/admin/promote')
                 .send({ email: testAdminEmail, role: 'SUPER_ADMIN' });
             expect(resPromote.status).toBe(404);
+        });
+    });
+
+    describe('Security Headers (Helmet)', () => {
+        test('sets expected security headers on HTTP responses', async () => {
+            const res = await request(app).get('/health');
+            expect(res.status).toBe(200);
+            expect(res.headers['x-content-type-options']).toBe('nosniff');
+            expect(res.headers['x-frame-options']).toBe('SAMEORIGIN');
+            expect(res.headers['x-dns-prefetch-control']).toBe('off');
+            expect(res.headers['content-security-policy']).toBeDefined();
+        });
+    });
+
+    describe('CORS Restrictions & Client Compatibility', () => {
+        test('allows requests with no Origin header (native Android apps)', async () => {
+            const res = await request(app).get('/health');
+            expect(res.status).toBe(200);
+        });
+
+        test('withholds Access-Control-Allow-Origin for untrusted web origins', async () => {
+            const res = await request(app)
+                .get('/health')
+                .set('Origin', 'https://malicious-website.example.com');
+            expect(res.status).toBe(200);
+            expect(res.headers['access-control-allow-origin']).toBeUndefined();
+        });
+
+        test('reflects Access-Control-Allow-Origin for allowed localhost in test environment', async () => {
+            const res = await request(app)
+                .get('/health')
+                .set('Origin', 'http://localhost:3000');
+            expect(res.status).toBe(200);
+            expect(res.headers['access-control-allow-origin']).toBe('http://localhost:3000');
+        });
+    });
+
+    describe('Database Readiness & Liveness Probes', () => {
+        test('returns 200 healthy on liveness probe', async () => {
+            const res = await request(app).get('/health');
+            expect(res.status).toBe(200);
+            expect(res.body.status).toBe('healthy');
+            expect(res.body).toHaveProperty('timestamp');
+        });
+
+        test('returns 200 ready when database is connected on readiness probe', async () => {
+            const res = await request(app).get('/health/ready');
+            expect(res.status).toBe(200);
+            expect(res.body.status).toBe('ready');
+            expect(res.body.database).toBe('connected');
+            expect(res.body).toHaveProperty('timestamp');
+        });
+
+        test('returns 503 unavailable when database connectivity fails without leaking credentials', async () => {
+            const originalQueryRaw = prisma.$queryRaw;
+            try {
+                (prisma as any).$queryRaw = jest.fn().mockRejectedValueOnce(
+                    new Error('Connection refused to postgresql://user:secret123@postgres:5432/db')
+                );
+                const res = await request(app).get('/health/ready');
+                expect(res.status).toBe(503);
+                expect(res.body.status).toBe('unavailable');
+                expect(res.body.database).toBe('disconnected');
+                expect(res.body.error).toBe('Database service unavailable');
+                // Ensure zero sensitive connection or credential leakage
+                expect(JSON.stringify(res.body)).not.toContain('secret123');
+                expect(JSON.stringify(res.body)).not.toContain('postgresql://');
+            } finally {
+                (prisma as any).$queryRaw = originalQueryRaw;
+            }
+        });
+    });
+
+    describe('Admin Login Rate Limiting', () => {
+        test('enforces rate limit after 5 login attempts while leaving participant uploads unblocked', async () => {
+            // First 5 attempts return 400 or 401
+            for (let i = 0; i < 5; i++) {
+                const res = await request(app)
+                    .post('/api/v1/auth/admin/login')
+                    .send({ email: 'ratelimit.test@adaptiq.org', password: 'wrongpassword' });
+                expect([400, 401]).toContain(res.status);
+            }
+
+            // 6th attempt must be rejected with HTTP 429
+            const blockedRes = await request(app)
+                .post('/api/v1/auth/admin/login')
+                .send({ email: 'ratelimit.test@adaptiq.org', password: 'wrongpassword' });
+            expect(blockedRes.status).toBe(429);
+            expect(blockedRes.body.error).toMatch(/too many login attempts/i);
+
+            // Verify participant endpoints remain completely unblocked
+            const participantRes = await request(app)
+                .post('/api/v1/auth/participant/session/start')
+                .send({ participantType: 'ADULT', condition: 'SITTING' });
+            expect(participantRes.status).toBe(201);
+            expect(participantRes.body).toHaveProperty('token');
+
+            // Verify liveness probe remains unblocked
+            const healthRes = await request(app).get('/health');
+            expect(healthRes.status).toBe(200);
         });
     });
 });

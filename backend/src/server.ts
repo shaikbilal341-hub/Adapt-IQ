@@ -1,18 +1,24 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import dotenv from 'dotenv';
 import bcrypt from 'bcrypt';
 import prisma from './config/database';
 import authRouter from './modules/auth/auth.controller';
 import sessionsRouter from './modules/sessions/sessions.controller';
 import { validateAndGetJwtSecret } from './middleware/auth.middleware';
+import { corsOptions } from './config/cors';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors());
+// Trust loopback reverse proxy (e.g. Caddy or Nginx on host 127.0.0.1)
+app.set('trust proxy', 'loopback');
+
+app.use(helmet());
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 
 // Optional: Bootstrap initial admin user strictly if environment variables are provided
@@ -43,9 +49,20 @@ async function bootstrapAdminFromEnv() {
     }
 }
 
-// Health check
+// Liveness probe (Express process responsiveness)
 app.get('/health', (req: Request, res: Response) => {
     res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
+// Readiness probe (Database connectivity check)
+app.get('/health/ready', async (req: Request, res: Response) => {
+    try {
+        await prisma.$queryRaw`SELECT 1`;
+        res.json({ status: 'ready', database: 'connected', timestamp: new Date().toISOString() });
+    } catch (e: any) {
+        console.error('Database readiness check failed');
+        res.status(503).json({ status: 'unavailable', database: 'disconnected', error: 'Database service unavailable' });
+    }
 });
 
 // API Routes

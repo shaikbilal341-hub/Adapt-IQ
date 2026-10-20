@@ -6,6 +6,8 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.example.adaptiq.admin.BuildConfig
 
+import com.example.adaptiq.admin.sync.validateProductionEndpoint
+
 class AdminAuthManager(context: Context) {
 
     private val masterKey = MasterKey.Builder(context)
@@ -37,25 +39,24 @@ class AdminAuthManager(context: Context) {
     }
 
     fun saveServerUrl(url: String) {
+        if (BuildConfig.IS_RELEASE) {
+            validateProductionEndpoint(url)
+        }
         sharedPreferences.edit().putString(KEY_SERVER_URL, url).apply()
     }
 
     fun getServerUrl(): String {
+        if (BuildConfig.IS_RELEASE) {
+            return validateProductionEndpoint(BuildConfig.PROD_URL)
+        }
         val saved = sharedPreferences.getString(KEY_SERVER_URL, null)
         if (!saved.isNullOrBlank()) {
-            if (BuildConfig.IS_RELEASE && !saved.startsWith("https://")) {
-                if (BuildConfig.PROD_URL.startsWith("https://")) {
-                    return BuildConfig.PROD_URL
-                }
-            } else if (!isEmulator() && saved.contains("10.0.2.2")) {
+            if (!isEmulator() && saved.contains("10.0.2.2")) {
                 val upgraded = BuildConfig.DEFAULT_DEVICE_URL
                 saveServerUrl(upgraded)
                 return upgraded
             }
             return saved
-        }
-        if (BuildConfig.IS_RELEASE && BuildConfig.PROD_URL.isNotBlank()) {
-            return BuildConfig.PROD_URL
         }
         return if (isEmulator()) BuildConfig.DEFAULT_EMULATOR_URL else BuildConfig.DEFAULT_DEVICE_URL
     }

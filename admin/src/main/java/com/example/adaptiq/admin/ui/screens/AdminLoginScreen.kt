@@ -79,54 +79,60 @@ fun AdminLoginScreen(
                         value = serverUrl,
                         onValueChange = {
                             serverUrl = it
-                            AdminApiClient.setServerUrl(it)
-                            onSaveServerUrl(it)
-                            connectionStatusMessage = null
-                            errorMessage = null
+                            try {
+                                AdminApiClient.setServerUrl(it)
+                                onSaveServerUrl(it)
+                                connectionStatusMessage = null
+                                errorMessage = null
+                            } catch (e: Exception) {
+                                errorMessage = e.message
+                            }
                         },
                         label = { Text("Backend Server URL") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    // Quick URL Presets
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        FilterChip(
-                            selected = serverUrl == BuildConfig.DEFAULT_DEVICE_URL,
-                            onClick = {
-                                serverUrl = BuildConfig.DEFAULT_DEVICE_URL
-                                AdminApiClient.setServerUrl(serverUrl)
-                                onSaveServerUrl(serverUrl)
-                                connectionStatusMessage = null
-                                errorMessage = null
-                            },
-                            label = { Text("Physical (LAN)", style = MaterialTheme.typography.labelSmall) }
-                        )
-                        FilterChip(
-                            selected = serverUrl == BuildConfig.DEFAULT_EMULATOR_URL,
-                            onClick = {
-                                serverUrl = BuildConfig.DEFAULT_EMULATOR_URL
-                                AdminApiClient.setServerUrl(serverUrl)
-                                onSaveServerUrl(serverUrl)
-                                connectionStatusMessage = null
-                                errorMessage = null
-                            },
-                            label = { Text("Emulator", style = MaterialTheme.typography.labelSmall) }
-                        )
-                        FilterChip(
-                            selected = serverUrl == "http://localhost:4000/",
-                            onClick = {
-                                serverUrl = "http://localhost:4000/"
-                                AdminApiClient.setServerUrl(serverUrl)
-                                onSaveServerUrl(serverUrl)
-                                connectionStatusMessage = null
-                                errorMessage = null
-                            },
-                            label = { Text("USB Proxy", style = MaterialTheme.typography.labelSmall) }
-                        )
+                    // Quick URL Presets (Debug only)
+                    if (!BuildConfig.IS_RELEASE) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = serverUrl == BuildConfig.DEFAULT_DEVICE_URL,
+                                onClick = {
+                                    serverUrl = BuildConfig.DEFAULT_DEVICE_URL
+                                    AdminApiClient.setServerUrl(serverUrl)
+                                    onSaveServerUrl(serverUrl)
+                                    connectionStatusMessage = null
+                                    errorMessage = null
+                                },
+                                label = { Text("Physical (LAN)", style = MaterialTheme.typography.labelSmall) }
+                            )
+                            FilterChip(
+                                selected = serverUrl == BuildConfig.DEFAULT_EMULATOR_URL,
+                                onClick = {
+                                    serverUrl = BuildConfig.DEFAULT_EMULATOR_URL
+                                    AdminApiClient.setServerUrl(serverUrl)
+                                    onSaveServerUrl(serverUrl)
+                                    connectionStatusMessage = null
+                                    errorMessage = null
+                                },
+                                label = { Text("Emulator", style = MaterialTheme.typography.labelSmall) }
+                            )
+                            FilterChip(
+                                selected = serverUrl == "http://localhost:4000/",
+                                onClick = {
+                                    serverUrl = "http://localhost:4000/"
+                                    AdminApiClient.setServerUrl(serverUrl)
+                                    onSaveServerUrl(serverUrl)
+                                    connectionStatusMessage = null
+                                    errorMessage = null
+                                },
+                                label = { Text("USB Proxy", style = MaterialTheme.typography.labelSmall) }
+                            )
+                        }
                     }
 
                     // Test Connection Button & Status

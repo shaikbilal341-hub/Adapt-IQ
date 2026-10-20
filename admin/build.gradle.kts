@@ -1,5 +1,6 @@
 import java.net.NetworkInterface
 import java.net.Inet4Address
+import java.net.URI
 
 plugins {
     alias(libs.plugins.android.application)
@@ -44,11 +45,52 @@ fun getLocalIpAddress(): String {
     return "192.168.0.103"
 }
 
+fun validateProductionUrl(url: String?): String {
+    if (url.isNullOrBlank()) {
+        throw GradleException(
+            "FATAL: Production release build requires an explicitly configured HTTPS backend URL. " +
+            "Please provide it via project property '-PprodBackendUrl=https://<domain>/' or environment variable 'PROD_BACKEND_URL=https://<domain>/'."
+        )
+    }
+    val trimmed = url.trim()
+    if (!trimmed.startsWith("https://", ignoreCase = true)) {
+        throw GradleException(
+            "FATAL: Production URL must use the HTTPS scheme. Insecure HTTP is strictly forbidden in production release builds. Provided: '$trimmed'"
+        )
+    }
+    try {
+        val uri = URI(trimmed)
+        val host = uri.host?.lowercase() ?: throw GradleException("FATAL: Production URL is malformed: missing valid host. Provided: '$trimmed'")
+        
+        // Disallow localhost, loopback, emulator (10.0.2.2), and private LAN IP ranges
+        if (host == "localhost" || host == "127.0.0.1" || host == "10.0.2.2" ||
+            host.startsWith("192.168.") || host.startsWith("10.") ||
+            host.matches(Regex("^172\\.(1[6-9]|2[0-9]|3[0-1])\\..*")) ||
+            host.endsWith(".local") || host.endsWith(".internal")) {
+            throw GradleException(
+                "FATAL: Production URL cannot target localhost, emulator (10.0.2.2), or local/private network addresses ($host). A public HTTPS production domain is required."
+            )
+        }
+    } catch (e: Exception) {
+        if (e is GradleException) throw e
+        throw GradleException("FATAL: Production URL is invalid: ${e.message}")
+    }
+    return if (trimmed.endsWith("/")) trimmed else "$trimmed/"
+}
+
 fun getProductionUrl(): String {
-    val prodUrl = project.findProperty("prodBackendUrl") as? String
+    val rawUrl = project.findProperty("prodBackendUrl") as? String
         ?: System.getenv("PROD_BACKEND_URL")
-        ?: ""
-    return if (prodUrl.isNotBlank() && !prodUrl.endsWith("/")) "$prodUrl/" else prodUrl
+    val isReleaseRequested = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
+    return if (isReleaseRequested) {
+        validateProductionUrl(rawUrl)
+    } else {
+        if (!rawUrl.isNullOrBlank()) {
+            validateProductionUrl(rawUrl)
+        } else {
+            ""
+        }
+    }
 }
 
 android {

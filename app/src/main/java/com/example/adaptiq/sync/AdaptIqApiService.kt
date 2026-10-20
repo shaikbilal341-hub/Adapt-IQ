@@ -24,9 +24,33 @@ fun isEmulator(): Boolean {
             || Build.HARDWARE.contains("ranchu"))
 }
 
+fun validateProductionEndpoint(url: String): String {
+    val trimmed = url.trim()
+    if (trimmed.isBlank()) {
+        throw IllegalStateException("FATAL: Production release build requires an explicitly configured HTTPS backend URL.")
+    }
+    if (!trimmed.startsWith("https://", ignoreCase = true)) {
+        throw IllegalStateException("FATAL: Production URL must use HTTPS. Insecure HTTP is forbidden in release builds.")
+    }
+    try {
+        val uri = java.net.URI(trimmed)
+        val host = uri.host?.lowercase() ?: throw IllegalStateException("FATAL: Production URL is malformed: missing valid host.")
+        if (host == "localhost" || host == "127.0.0.1" || host == "10.0.2.2" ||
+            host.startsWith("192.168.") || host.startsWith("10.") ||
+            host.matches(Regex("^172\\.(1[6-9]|2[0-9]|3[0-1])\\..*")) ||
+            host.endsWith(".local") || host.endsWith(".internal")) {
+            throw IllegalStateException("FATAL: Production URL cannot target localhost, emulator, or private LAN address ($host).")
+        }
+    } catch (e: Exception) {
+        if (e is IllegalStateException) throw e
+        throw IllegalStateException("FATAL: Production URL is invalid: ${e.message}")
+    }
+    return if (trimmed.endsWith("/")) trimmed else "$trimmed/"
+}
+
 fun getDefaultBaseUrl(): String {
-    if (BuildConfig.IS_RELEASE && BuildConfig.PROD_URL.isNotBlank()) {
-        return BuildConfig.PROD_URL
+    if (BuildConfig.IS_RELEASE) {
+        return validateProductionEndpoint(BuildConfig.PROD_URL)
     }
     return if (isEmulator()) BuildConfig.DEFAULT_EMULATOR_URL else BuildConfig.DEFAULT_DEVICE_URL
 }
@@ -122,6 +146,9 @@ object AdaptIqHttpClient {
     var baseUrl: String = getDefaultBaseUrl()
         set(value) {
             val normalized = if (value.endsWith("/")) value else "$value/"
+            if (BuildConfig.IS_RELEASE) {
+                validateProductionEndpoint(normalized)
+            }
             field = normalized
             _api = createApi(normalized)
         }

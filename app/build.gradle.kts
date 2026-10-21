@@ -112,16 +112,68 @@ android {
         buildConfigField("String", "DEFAULT_DEVICE_URL", "\"http://$detectedHost:4000/\"")
         buildConfigField("String", "HOST_LAN_IP", "\"$detectedHost\"")
         buildConfigField("String", "PROD_URL", "\"$prodUrl\"")
+
+        // Universal CPU ABI packaging: bundle all 4 major Android architectures in single APK
+        ndk {
+            abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64"))
+        }
+    }
+
+    signingConfigs {
+        named("debug") {
+            val repoKeystore = rootProject.file("keystore/adaptiq-distribution.keystore")
+            if (repoKeystore.exists()) {
+                storeFile = repoKeystore
+                storePassword = "adaptiq_distribution_key"
+                keyAlias = "adaptiq"
+                keyPassword = "adaptiq_distribution_key"
+            }
+            enableV1Signing = true
+            enableV2Signing = true
+        }
+        create("release") {
+            val customKeystore = project.findProperty("releaseKeystorePath") as? String
+                ?: System.getenv("RELEASE_KEYSTORE_PATH")
+            if (!customKeystore.isNullOrBlank() && file(customKeystore).exists()) {
+                storeFile = file(customKeystore)
+                storePassword = project.findProperty("releaseKeyStorePassword") as? String
+                    ?: System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: ""
+                keyAlias = project.findProperty("releaseKeyAlias") as? String
+                    ?: System.getenv("RELEASE_KEY_ALIAS") ?: ""
+                keyPassword = project.findProperty("releaseKeyPassword") as? String
+                    ?: System.getenv("RELEASE_KEY_PASSWORD") ?: ""
+            } else {
+                val repoKeystore = rootProject.file("keystore/adaptiq-distribution.keystore")
+                if (repoKeystore.exists()) {
+                    storeFile = repoKeystore
+                    storePassword = "adaptiq_distribution_key"
+                    keyAlias = "adaptiq"
+                    keyPassword = "adaptiq_distribution_key"
+                } else {
+                    val debugKeystore = file(System.getProperty("user.home") + "/.android/debug.keystore")
+                    if (debugKeystore.exists()) {
+                        storeFile = debugKeystore
+                        storePassword = "android"
+                        keyAlias = "androiddebugkey"
+                        keyPassword = "android"
+                    }
+                }
+            }
+            enableV1Signing = true
+            enableV2Signing = true
+        }
     }
 
     buildTypes {
         debug {
             manifestPlaceholders["usesCleartextTraffic"] = "true"
             buildConfigField("Boolean", "IS_RELEASE", "false")
+            signingConfig = signingConfigs.getByName("debug")
         }
         release {
             manifestPlaceholders["usesCleartextTraffic"] = "false"
             buildConfigField("Boolean", "IS_RELEASE", "true")
+            signingConfig = signingConfigs.getByName("release")
             optimization {
                 enable = false
             }
@@ -135,6 +187,21 @@ android {
         compose = true
         buildConfig = true
     }
+}
+
+// Automatically publish the standalone universal APK to distribution/ on every assembleDebug build
+tasks.register<Copy>("copyUniversalApk") {
+    description = "Copies the standalone universal APK to the distribution directory"
+    group = "distribution"
+    from(layout.buildDirectory.dir("outputs/apk/debug"))
+    include("app-debug.apk")
+    into(rootProject.layout.projectDirectory.dir("distribution"))
+    rename("app-debug.apk", "AdaptIQ-Participant-Universal.apk")
+    dependsOn("assembleDebug")
+}
+
+afterEvaluate {
+    tasks.findByName("assembleDebug")?.finalizedBy("copyUniversalApk")
 }
 
 dependencies {
